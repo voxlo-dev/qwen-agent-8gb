@@ -5,6 +5,16 @@
 # applied. FORCE=1 rebuilds even when the pinned binary is there.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
+# A prebuilt llama.cpp is checked, never built: LLAMA_DIR is someone else's install then.
+if [[ -n "$LLAMA_PREBUILT" ]]; then
+  [[ -x "$LLAMA_SERVER" ]] || die "$MODEL runs on $LLAMA_PREBUILT's prebuilt llama.cpp, not found at $LLAMA_SERVER - install Unsloth Studio (https://github.com/unslothai/unsloth), see docs/qwen.md#qwen38-flash-125b-experimental"
+  have="$(LD_LIBRARY_PATH="$LLAMA_LIB_PATH${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" "$LLAMA_SERVER" --version 2>&1 | sed -n 's/.*(build \([0-9]*\),.*/\1/p')"
+  [[ "$have" == "$LLAMA_BUILD" ]] \
+    || warn "$LLAMA_PREBUILT's llama-server is build ${have:-unknown}, $MODEL was measured on $LLAMA_BUILD - it may load differently or not at all"
+  log "using $LLAMA_PREBUILT's prebuilt llama-server (build ${have:-unknown}) at $LLAMA_DIR"
+  exit 0
+fi
+
 # The stamp names commit, backend and patch set, so a change to any of them triggers a rebuild.
 patches=()
 patch_dir="$ROOT/${PATCH_DIR:-no-patches}"
