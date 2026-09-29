@@ -151,9 +151,11 @@ Git Bash or MSYS2 is not the shortcut it looks like: `nvidia-smi` and cmake run 
 
 Against roughly 700 lines of PowerShell, a second test matrix and a second set of measurements,
 the gain is that a Windows user does not run `wsl --install`. The one argument with substance is
-speed - native would not pay the WSL2 passthrough - and it is unmeasured; the host-side comparison
-in [Performance](performance.md#what-is-left) found nothing that puts 36 tok/s in question. If a
-measurement ever shows a real gap, this is the entry it reopens.
+speed - native would not pay the WSL2 passthrough. For Bonsai it is measured now and there is none:
+36.6 tok/s on native Linux against 36 under WSL2. For the MoE models there is, 30-100 %, because
+their experts are read from host memory ([qwen.md](qwen.md#native-linux)). That gap argues for
+native Linux, which this repo already supports, not for a native Windows port, which is unmeasured
+and would pay its own costs; it is what a measurement on native Windows would have to beat.
 
 ## Other GPU backends
 

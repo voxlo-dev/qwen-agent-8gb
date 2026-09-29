@@ -205,6 +205,7 @@ bonsai-server --port 9000
 | `CTX` | `64000` | context window in tokens (profile); the most 8 GB holds at the default cache types. 96k fits with `q4_0`/`q4_0`, see [Context window](docs/context-window.md) |
 | `KV_K` / `KV_V` | `q8_0` / `q4_0` | KV cache types for keys and values; measured against `f16` in [Context window](docs/context-window.md#kv-cache-quality) |
 | `EFFORT` | `medium` | chat-template reasoning effort: `low`, `medium`, `xhigh` |
+| `SPEC_TYPE` | per model | speculative decoding; `draft-mtp` for Qwen3.6. Turn it off with `none`: an empty value falls back to the model's default |
 | `BUDGET` | `8192` (profile) | thinking tokens per turn; at most `RESERVE_TOKENS - 4096 -` a tool call, see [Context budget](docs/dev.md#context-budget) |
 | `PRESERVE_THINKING` | `false` | keep earlier turns' thinking in the prompt |
 | `MAX_TOKENS` | `16000` (profile) | pi's output cap per turn |
@@ -225,7 +226,8 @@ The last three carry each other: pi's own defaults assume a 200k window and make
 
 `MODEL=qwen36-35b` serves [Qwen3.6-35B-A3B](https://huggingface.co/Qwen/Qwen3.6-35B-A3B) instead,
 a mixture-of-experts model whose experts live in system RAM while the card holds the rest. On the
-same 4060 Ti it runs a 131k window at 39-45 tok/s on natural output, with multi-token prediction.
+same 4060 Ti it runs a 131k window at 39-45 tok/s on natural output under WSL2, with multi-token
+prediction, and at 52-65 tok/s on native Linux.
 It needs **~28 GB of RAM** (under WSL2, raise `memory=` in `%UserProfile%\.wslconfig`), 22 GB of
 disk, and a mainline llama.cpp build next to the fork. On the RX 570 it runs too, at
 2.5-3.5x Bonsai's speed there, ~22 tok/s at 131k. In its one agent session so far it built the
@@ -240,8 +242,10 @@ Each model has its own profiles and its own pi config (`pi-agent-qwen36-35b/`), 
 not touch the other one's settings or sessions.
 
 `MODEL=qwen38-flash` goes further: [Qwen3.8-Flash-Next](https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF),
-125B, every expert in RAM, a 131k window at 9-10 tok/s and prompts at ~36 tok/s. A side experiment,
-not tried as an agent yet. It needs **~48 GB of RAM** (a 64 GB PC with `memory=50GB` for WSL2),
+125B, every expert in RAM, a 131k window at **~19 tok/s and prompts at ~100 tok/s on native Linux**
+with a lean desktop, 9-10 and ~36 under WSL2. A side experiment, not tried as an agent yet. It
+needs **~48 GB of RAM** to run and **~58 GB available** to keep every expert cached, which a 64 GB
+PC reaches on native Linux with the browser and editors closed ([why](docs/qwen.md#native-linux)),
 88 GB of disk, an 8 GB card that drives no display, and [Unsloth Studio](https://github.com/unslothai/unsloth)
 installed: it runs on Unsloth's prebuilt llama.cpp, since mainline runs out of VRAM on its sparse
 attention. Details in [docs/qwen.md](docs/qwen.md#qwen38-flash-125b-experimental).

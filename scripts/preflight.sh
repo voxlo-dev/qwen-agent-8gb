@@ -92,6 +92,10 @@ elif ((MODEL_RAM_MB > 0)); then
   elif ((avail_mb < MODEL_RAM_MB - 4000)); then
     # Most of what it holds is the mmapped experts as page cache, which counts as available.
     soft "RAM: ${avail_mb} of ${total_mb} MB available, $MODEL holds ~${MODEL_RAM_MB} MB while serving - close something before starting it"
+  elif ((avail_mb < MODEL_RAM_FULL_MB)); then
+    # Runs, but not every expert stays cached: the SSD is in the loop, and a prompt read on the CPU
+    # evicts what the next token needs. Measured in docs/qwen.md#native-linux.
+    soft "RAM: ${avail_mb} of ${total_mb} MB available - $MODEL keeps every expert cached from ~${MODEL_RAM_FULL_MB} MB; below that it reads from the SSD (~17 instead of ~19 tok/s, prompts at ~70 instead of ~100). Close the browser and editors, or run it on native Linux${wslhint:+ rather than WSL2}"
   else
     pass "RAM: ${avail_mb} of ${total_mb} MB available, $MODEL holds ~${MODEL_RAM_MB} MB"
   fi

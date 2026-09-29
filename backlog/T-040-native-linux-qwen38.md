@@ -6,6 +6,15 @@
 - **Effort:** M (the install is most of it; the measurement ~1 h, the Tron session 1-2 h)
 - **Depends on:** a native Linux install on the 4060 Ti machine (dual boot or a second SSD); T-039's numbers as the baseline
 
+## Result so far (2026-09-29)
+
+Measured and written up in [qwen.md](../docs/qwen.md#native-linux): Qwen3.6 30-55 % faster than
+under WSL2, Qwen3.8-Flash 18.6-18.9 tok/s and prompts at ~100 with every expert cached, which needs
+~58 GB available before start (terminal only; with a browser and editors open it drops to 16-18
+with the SSD in the loop). `MODEL_RAM_FULL_MB` and a preflight warning carry it. Runs in
+`runs/T-040-native-linux/`. **Left: step 6, Tron session E**, then close. Step 5 (mmproj on the CPU)
+is skipped: 0.9 GB is more than the ~2 GiB of margin can spare.
+
 ## Why
 
 Measured on 2026-09-29 (`runs/T-039-qwen38-flash/ssd/`): four 256-token turns after a restart

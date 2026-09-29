@@ -38,3 +38,9 @@ default in two interleaved pairs, 256-token turns, 9.85 against 9.3 tok/s mean (
 by `-t 7`), pp unchanged. So the effect is not Vulkan's alone. The side study before it measured
 ~4 % for the same switch. What this ticket still has to run is Qwen3.6 itself, with MTP, where the
 GPU's share of each token is larger.
+
+## A data point from T-040
+
+The same machine on native Linux (8 cores / 16 threads, no VM): Qwen3.8-Flash, the same two
+interleaved pairs, `-t 7` against the default 8 won once each, 256-token turns within ~3 %. The
+WSL2 effect does not carry over. Qwen3.6 with MTP is still unrun, now best run natively.
