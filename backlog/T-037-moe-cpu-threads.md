@@ -29,3 +29,12 @@ as an extra argument: `bonsai-server -t N`.
   derives cores minus one. The reason goes into `docs/qwen.md`.
 - **No difference on CUDA**: the finding stays a note for Vulkan in `docs/qwen.md`, and this file is
   deleted.
+
+## A data point from T-039
+
+On the 4060 Ti machine (7800X3D, 8 cores / 16 threads under WSL2, llama.cpp's default 8 threads),
+**Qwen3.8-Flash** with every expert in RAM, through `bonsai-server` on CUDA: `-t 7` against the
+default in two interleaved pairs, 256-token turns, 9.85 against 9.3 tok/s mean (each pair won
+by `-t 7`), pp unchanged. So the effect is not Vulkan's alone. The side study before it measured
+~4 % for the same switch. What this ticket still has to run is Qwen3.6 itself, with MTP, where the
+GPU's share of each token is larger.

@@ -198,7 +198,7 @@ bonsai-server --port 9000
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `MODEL` | `bonsai` | `bonsai` or `qwen36-35b`, see [A second model](#a-second-model-experimental) |
+| `MODEL` | `bonsai` | `bonsai`, `qwen36-35b` or `qwen38-flash`, see [A second model](#a-second-model-experimental) |
 | `BACKEND` | `cuda` | `cuda` or `vulkan`; read by `deps`, `build` and `bonsai-server`. `build` rebuilds by itself when it changes |
 | `BUILD_JOBS` | auto | parallel compile jobs; empty derives them from free RAM and core count, see [RAM and build memory](docs/dev.md#ram-and-build-memory) |
 | `CTX` | `64000` | context window in tokens (profile); the most 8 GB holds at the default cache types. 96k fits with `q4_0`/`q4_0`, see [Context window](docs/context-window.md) |
@@ -237,6 +237,13 @@ MODEL=qwen36-35b bonsai-pi
 
 Each model has its own profiles and its own pi config (`pi-agent-qwen36-35b/`), so switching does
 not touch the other one's settings or sessions.
+
+`MODEL=qwen38-flash` goes further: [Qwen3.8-Flash-Next](https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF),
+125B, every expert in RAM, a 131k window at 9-10 tok/s and prompts at ~36 tok/s. A side experiment,
+not tried as an agent yet. It needs **~48 GB of RAM** (a 64 GB PC with `memory=50GB` for WSL2),
+88 GB of disk, an 8 GB card that drives no display, and [Unsloth Studio](https://github.com/unslothai/unsloth)
+installed: it runs on Unsloth's prebuilt llama.cpp, since mainline runs out of VRAM on its sparse
+attention. Details in [docs/qwen.md](docs/qwen.md#qwen38-flash-125b-experimental).
 
 ## Performance
 
