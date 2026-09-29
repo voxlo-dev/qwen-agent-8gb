@@ -11,6 +11,16 @@ if [[ -n "$LLAMA_PREBUILT" ]]; then
   have="$(LD_LIBRARY_PATH="$LLAMA_LIB_PATH${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" "$LLAMA_SERVER" --version 2>&1 | sed -n 's/.*(build \([0-9]*\),.*/\1/p')"
   [[ "$have" == "$LLAMA_BUILD" ]] \
     || warn "$LLAMA_PREBUILT's llama-server is build ${have:-unknown}, $MODEL was measured on $LLAMA_BUILD - it may load differently or not at all"
+  # The build number is the same for every backend. An installer that ran while the NVIDIA driver
+  # was not working picks the Vulkan or CPU build, which then serves from the iGPU or the CPU
+  # without a word; so does a missing CUDA runtime. See docs/dev.md#troubleshooting.
+  if [[ "$BACKEND" == cuda ]]; then
+    bin="$(dirname "$(readlink -f "$LLAMA_SERVER")")"
+    [[ -e "$bin/libggml-cuda.so" ]] \
+      || die "$LLAMA_PREBUILT's llama-server in $bin has no CUDA backend (no libggml-cuda.so) - it was installed without a working NVIDIA driver; repair or reinstall it now that nvidia-smi runs"
+    [[ -z "$LLAMA_LIB_PATH" || -d "$LLAMA_LIB_PATH" ]] \
+      || die "the CUDA runtime is not at LLAMA_LIB_PATH=$LLAMA_LIB_PATH - without it the prebuilt runs on the CPU; repair or reinstall $LLAMA_PREBUILT, or set LLAMA_LIB_PATH to its nvidia/cu13/lib"
+  fi
   log "using $LLAMA_PREBUILT's prebuilt llama-server (build ${have:-unknown}) at $LLAMA_DIR"
   exit 0
 fi

@@ -1,16 +1,17 @@
 # T-032 — A Dockerfile for the server, not for pi
 
-- **Summary:** One `Dockerfile` that builds and runs `llama-server` in a container, with pi staying on the host and pointing at it through `SERVER_HOST`. It answers "my distro's apt cannot deliver the toolchain" (T-005) without generalising `deps.sh`; it answers nothing about drivers, VRAM or the profile
+- **Summary:** One `Dockerfile` that builds and runs `llama-server` in a container, with pi staying on the host and pointing at it through `SERVER_HOST`. It answers "my distro's apt cannot deliver the toolchain" without generalising `deps.sh`; it answers nothing about drivers, VRAM or the profile
 - **Category:** feature
 - **Importance:** medium
 - **Effort:** M
-- **Depends on:** none. Overlaps T-005: whichever lands first takes the "unsupported distro" answer
+- **Depends on:** none. T-005 (closed) settled the apt side: `deps` stops early and names NVIDIA's repository
 
 ## Why
 
-`deps.sh` is apt, and the backlog already carries the consequences: T-005 has Ubuntu 24.04,
-22.04 and Debian 13 each failing differently, and every system beyond Debian and Ubuntu brings
-its own toolchain by hand. A container moves that one problem - and only that one - off the
+`deps.sh` is apt. Where apt's CUDA is too old (Ubuntu 24.04, 22.04, Debian 13) it now stops at
+once and points to NVIDIA's repository ([Toolchain](../docs/dev.md#toolchain)), which is four
+commands and a pin on the host; every system beyond Debian and Ubuntu still brings its own
+toolchain by hand. A container moves that one problem - and only that one - off the
 host. The driver still has to be on the host, the card still needs 8 GB, and the profile
 arithmetic does not change.
 

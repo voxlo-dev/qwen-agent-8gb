@@ -1,6 +1,6 @@
 # T-040 — Qwen3.8-Flash on native Linux: every expert in RAM, without a smaller quant
 
-- **Summary:** Under WSL2 the page cache holds ~46 GiB, less than the 55.4 GiB of routed experts in UD-IQ4_XS, so a warm decode still reads ~9 MB per token from the SSD. Native Linux on the same machine should leave ~58-60 GB for the cache and fit them all. Measure it against T-039's WSL2 numbers and Tron session D; verify T-006 on the way
+- **Summary:** Under WSL2 the page cache holds ~46 GiB, less than the 55.4 GiB of routed experts in UD-IQ4_XS, so a warm decode still reads ~9 MB per token from the SSD. Native Linux on the same machine should leave ~58-60 GB for the cache and fit them all. Measure it against T-039's WSL2 numbers and Tron session D
 - **Category:** spike
 - **Importance:** medium
 - **Effort:** M (the install is most of it; the measurement ~1 h, the Tron session 1-2 h)
@@ -37,11 +37,14 @@ at ~29 tok/s without MTP; Qwen3.8 reads ~1.1 GB, which suggests ~15 tok/s agains
 
 ## What to run
 
-1. **Install**: the repo's README on native Ubuntu 26.04, from a fresh clone. That is T-006's
-   check (apt's CUDA toolkit next to a native driver) and part of T-004. Record what differed from
-   WSL2. The display stays on the iGPU; the iGPU carve-out as small as the BIOS allows (record it).
-   The model: `MODEL=qwen38-flash ./install.sh`; Unsloth Studio for its prebuilt (T-038).
-2. **Memory**: `MemTotal`, and after a warm run `RssFile`, `RssAnon`, and whether all 55.4 GiB
+1. **Install**: done on 2026-09-29, Linux Mint 22.3 native (Ubuntu 24.04 base), driver
+   595-open, CUDA 12.9 from NVIDIA; what it took is in `docs/dev.md#toolchain` (T-004/5/6 closed).
+   Unsloth Studio reinstalled after the driver worked: build 11160, CUDA backend, cu13 runtime at
+   the configured `LLAMA_LIB_PATH`. The GGUF is in the HF cache, `model` links it. The display is
+   on the iGPU (15 MiB used on the card). Still to record: the BIOS iGPU carve-out; MemTotal is
+   61 961 MB against 65 536, so ~3.5 GB are not visible to Linux.
+2. **Memory**: MemAvailable at an idle desktop is ~58.4 GB, against 55.4 GiB (59.5 GB) of experts:
+   they will not all fit with a desktop running. After a warm run `RssFile`, `RssAnon`, and whether all 55.4 GiB
    of experts stay cached (the SSD read per turn below says it).
 3. **Speed**: T-039's `run.sh` (the `full` mode twice, default threads and `-t 7`, interleaved),
    and the SSD script from `runs/T-039-qwen38-flash/ssd/` for reads per turn. The VRAM the driver
@@ -59,4 +62,3 @@ at ~29 tok/s without MTP; Qwen3.8 reads ~1.1 GB, which suggests ~15 tok/s agains
   RAM hint names it. `UD-Q2_K_XL` is not needed.
 - **About the same**: the SSD was not the limit; the result goes into `docs/qwen.md`, and a smaller
   quant under WSL2 is not worth its quality either.
-- Either way T-006 gets its answer, and closes or keeps what is left.

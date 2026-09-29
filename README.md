@@ -97,6 +97,7 @@ Two backends, chosen with `BACKEND` (default `cuda`).
 | Card | `BACKEND` | System | Generation | For |
 | --- | --- | --- | --- | --- |
 | RTX 4060 Ti 8 GB | `cuda` | Windows 11 + WSL2, Ubuntu 26.04 | 36 tok/s | interactive use, the default |
+| RTX 4060 Ti 8 GB | `cuda` | Linux Mint 22.3 native (Ubuntu 24.04 base), CUDA 12.9 from NVIDIA | 36.6 tok/s | the same card without WSL2: the same speed |
 | AMD RX 570 8 GB | `vulkan` | Debian 13, RADV, Mesa 26.1 | 7 tok/s | **batch use**: `-p` runs left alone, not a conversation |
 
 **Expected to work, unmeasured** - same architecture families, nobody has reported numbers.
@@ -118,12 +119,12 @@ decode speed), ROCm/HIP, Metal, and CPU-only. Vulkan is the one AMD path.
 
 [Toolchain](docs/dev.md#toolchain) says what is known beyond that, [Other GPU backends](docs/dev.md#other-gpu-backends) where the Vulkan numbers come from.
 
-- Linux, native or WSL2. CUDA: a working NVIDIA driver (`nvidia-smi` runs; under WSL2 it is installed on the Windows side). Vulkan: the `amdgpu` kernel driver and **Mesa >= 25.2** (Debian 13 ships 25.0.7; take `mesa-vulkan-drivers` from `trixie-backports`), and your user in the `render` group
+- Linux, native or WSL2. CUDA: a working NVIDIA driver (`nvidia-smi` runs; under WSL2 it is installed on the Windows side; natively with Secure Boot on, its module key must be enrolled, see [Secure Boot](docs/dev.md#secure-boot)). Vulkan: the `amdgpu` kernel driver and **Mesa >= 25.2** (Debian 13 ships 25.0.7; take `mesa-vulkan-drivers` from `trixie-backports`), and your user in the `render` group
 - A GPU with 8 GB VRAM, of which ~7.3 GB must be **free**: the GPU should drive no display, see [VRAM budget](docs/dev.md#vram-budget). Less does not work, the model does not run partially offloaded at usable speed
-- CUDA: toolkit >= 12.4 with a host gcc it accepts; >= 12.8 for RTX 50xx. `./install.sh deps` installs it via apt, which yields 12.4 on Ubuntu 26.04 only. Vulkan: `glslc`, the Vulkan headers and loader; `deps` installs them on Debian and Ubuntu
-- Node.js >= 22.19 for pi
+- CUDA: toolkit >= 12.4 with a host gcc it accepts; >= 12.8 for RTX 50xx. `./install.sh deps` installs it via apt, which yields 12.4 on Ubuntu 26.04 only; on 24.04 and its derivatives (Linux Mint 22) it stops and points to [CUDA from NVIDIA's repository](docs/dev.md#cuda-from-nvidias-repository), four commands, after which `./install.sh` runs through. Vulkan: `glslc`, the Vulkan headers and loader; `deps` installs them on Debian and Ubuntu
+- Node.js >= 22.19 for pi: apt has it on Ubuntu 26.04 only (24.04 ships 18, Debian 13 20), elsewhere take it from [nvm](https://github.com/nvm-sh/nvm) or NodeSource
 - **8 GB RAM** to serve: the model is read through `mmap`, so llama-server peaks at 5.8 GB while loading and then sits below 700 MB, with the rest as reclaimable page cache. Building wants more headroom - a single Vulkan shader unit peaks at 4.4 GB - so `build` caps its parallelism at ~2 GB per job instead of `-j $(nproc)`; `BUILD_JOBS` overrides it. See [RAM and build memory](docs/dev.md#ram-and-build-memory)
-- ~14 GB free disk: 5.6 GB model, 1.9 GB build, ~5.4 GB for the CUDA toolkit from apt. ~9 GB when a CUDA toolkit is already installed, or with Vulkan
+- ~14 GB free disk: 5.6 GB model, 1.9 GB build, ~5.4 GB for the CUDA toolkit from apt (7.3 GB for NVIDIA's 12.9). ~9 GB when a CUDA toolkit is already installed, or with Vulkan
 
 Without apt, install the toolchain yourself (CUDA and gcc, or glslc and the Vulkan SDK; plus cmake, git, python3) and skip `deps`: `./install.sh build model pi link`.
 
@@ -134,7 +135,7 @@ work that is already done:
 
 | Step | Does |
 | --- | --- |
-| `deps` | apt toolchain for `BACKEND`: build tools, cmake, then gcc-13 and the CUDA toolkit, or glslc and the Vulkan headers (asks for sudo, so run it in a real terminal) |
+| `deps` | apt toolchain for `BACKEND`: build tools, cmake, then gcc-13 and the CUDA toolkit (kept as is when an `nvcc` >= 12.4 is already installed), or glslc and the Vulkan headers (asks for sudo, so run it in a real terminal) |
 | `build` | clones the fork at the pinned commit, applies `patches/$BACKEND/`, builds `llama-server` (`FORCE=1` rebuilds) |
 | `model` | links the GGUF from the Hugging Face cache, or downloads and checksums it |
 | `pi` | installs its own pinned pi and writes its config: provider `local` as default, the context budget, `AGENTS.md`. A pi you already have and `~/.pi` stay untouched |
