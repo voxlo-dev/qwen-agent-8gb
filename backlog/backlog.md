@@ -7,7 +7,7 @@ Numbers have gaps: a closed ticket's file is deleted, and a ticket that is nobod
 is named `T-NNN-{slug}.local.md`, which `.gitignore` keeps out of the repo. The counter below never
 reuses a number either way.
 
-**Next ticket: `T-040`**
+**Next ticket: `T-041`**
 
 ## Draft
 
@@ -25,6 +25,7 @@ reuses a number either way.
 - [`T-034`](T-034-qwen-moe-model.md) A second model: Qwen3.6-35B-A3B with the experts in RAM — measured and built (`MODEL=qwen36-35b`, 131k, MTP on mainline); one agent session run (Tron in 7 min, rematch broken); left: supported or experimental, the `display` check; the slot a Qwen 4 35B-A3B drops into · feature · medium · S
 - [`T-038`](T-038-unsloth-llama-for-qwen.md) Unsloth's llama.cpp as the tree every Qwen model runs on — Qwen3.8-Flash needs its banded sparse attention and uses the Studio prebuilt for now; build it from a pinned source (a release tarball: its commit is not fetchable), then re-measure Qwen3.6 with MTP on it · feature · medium · M
 - [`T-039`](T-039-qwen38-flash.md) Qwen3.8-Flash (125B, experts in RAM) as a third, experimental model — built and measured for speed (9-10 tok/s at 131k, on the Unsloth prebuilt); left: one agent session, `q4_0` KV quality for the 262k option · spike · low · S
+- [`T-040`](T-040-native-linux-qwen38.md) Qwen3.8-Flash on native Linux — under WSL2 the page cache holds ~46 of 55.4 GiB of experts and a warm decode still reads ~9 MB per token from the SSD; native should fit them all without a smaller quant; measure against T-039 and Tron session D, verify T-006 on the way · spike · medium · M
 - [`T-037`](T-037-moe-cpu-threads.md) Threads for the experts in RAM — `-t 7` of 8 vCPUs is ~10 % faster on the RX 570 box; measure on the 4060 Ti, then a `THREADS` setting, a cores-minus-one default, or nothing · spike · low · S
 
 ## Open source (release checklist)
