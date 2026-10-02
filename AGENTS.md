@@ -25,9 +25,11 @@ incomplete, and a change that contradicts one needs a new measurement, not an ar
 | `install.sh` | Step runner: `deps build model pi link`, all of them by default. Runs `preflight` first |
 | `scripts/preflight.sh` | Gates a run before it spends time: disk, RAM, driver, VRAM, Node, port. Reports every item, exits once. `SKIP_PREFLIGHT=1` bypasses it |
 | `scripts/lib.sh` | Sourced first by every step; sources `config.env` and defines `log`/`warn`/`die`/`has` |
-| `scripts/{deps,build,model,pi}.sh` | One install step each, individually re-runnable and idempotent. `deps` and `build` branch on `BACKEND` (`cuda`, `vulkan`) |
+| `scripts/{deps,build,model,pi}.sh` | One install step each, individually re-runnable and idempotent. `deps` and `build` branch on `BACKEND` (`cuda`, `vulkan`); `build` fetches a git commit, or a checksummed release tarball (`LLAMA_TARBALL`) where the commit is not fetchable (Unsloth's tree) |
+| `scripts/server-flags.sh` | The llama-server flags and environment of the selected model and profile, sourced by both launchers. Long spellings only: Unsloth Studio's parser misreads short clusters |
 | `patches/{backend}/*.patch` | Applied by `build` to the fork at `LLAMA_COMMIT`, in name order, for that backend only, and only for a model whose `PATCH_DIR` names them (Bonsai). Today: the PTQ1_0 Vulkan decode, until upstream takes it (T-017) |
-| `bin/bonsai-server` | The launcher. Sources `config.env` **directly**, not through `lib.sh` |
+| `bin/bonsai-server` | The launcher. Sources `config.env` **directly**, not through `lib.sh`, then `scripts/server-flags.sh` |
+| `bin/bonsai-studio` | Opens the same model in Unsloth Studio (`unsloth studio run`) on this repo's build, with the flags from `server-flags.sh` passed through. Same sourcing as `bonsai-server` |
 | `bin/bonsai-pi` | Starts the pinned pi with `PI_CODING_AGENT_DIR` set to `PI_AGENT_DIR`, and starts/stops `bonsai-server` around it when none runs. State in `$BONSAI_HOME/run/`. Same sourcing as `bonsai-server` |
 | `pi/pi-agents.md` | Runtime artifact, copied to `$PI_AGENT_DIR/AGENTS.md`. **Not this file** |
 | `pi/extensions/localagent/` | pi extension behind `bonsai-pi --localagent`: the `dispatch` tool, and the session's `hasUI` for the plan gate. **Frozen, not recommended**: see below |
@@ -48,7 +50,7 @@ than the window holds. Never change one alone; the constraints are in
 [`docs/dev.md`](docs/dev.md#context-budget).
 
 **Pins are deliberate.** `LLAMA_COMMIT`, `MODEL_REV` and `MODEL_SHA256` exist per model: Bonsai
-needs a fork mainline llama.cpp has not absorbed, Qwen a mainline commit whose MTP drafting was measured. `PI_VERSION` pins the compaction code the budget
+needs a fork mainline llama.cpp has not absorbed, Qwen Unsloth's tree (a source tarball, checksummed) whose MTP drafting and sparse attention were measured, mainline on Vulkan. `PI_VERSION` pins the compaction code the budget
 was measured against. Moving any of them means re-testing load and speed, checking that `patches/`
 still applies (`build` refuses when it does not), and for `PI_VERSION` re-checking the budget.
 
@@ -61,7 +63,7 @@ existing pi keeps its providers, defaults and compaction settings.
 ```bash
 ./install.sh                       # everything; FORCE=1 ./install.sh build rebuilds
 BACKEND=vulkan ./install.sh build  # the AMD path, patches and all
-MODEL=qwen36-35b ./install.sh      # the second model: mainline tree, its GGUF, its pi dir
+MODEL=qwen36-35b ./install.sh      # the second model: Unsloth's tree, its GGUF, its pi dir
 bonsai-pi                          # starts the server itself
 ```
 
@@ -108,7 +110,7 @@ Every fact has one home, chosen by how long it stays true.
 | `docs/dev.md` | durable | why each non-default choice is what it is, with its measurement, plus troubleshooting. Also this project's decisions log |
 | `docs/performance.md` | durable | what limits generation speed: the bandwidth roofline, and the optimizations tried and rejected |
 | `docs/context-window.md` | durable | the window and the KV cache for both models: what fits on 8 GB, the silent WSL2 spill, KV quality against f16 |
-| `docs/qwen.md` | durable | the MoE models: why a MoE, the offload/MTP/fork-or-mainline measurement, their profiles, Qwen3.8-Flash with every expert in RAM, the Qwen 4 slot |
+| `docs/qwen.md` | durable | the MoE models: why a MoE, the offload/MTP/fork-or-mainline measurement, the Unsloth tree, their profiles, Qwen3.8-Flash with every expert in RAM, the Qwen 4 slot |
 | `docs/localagent.md` | durable | the frozen workflow: why it is not recommended, its shape, how it runs on pi, the measured runs |
 | `docs/model-comparison.md` | durable | eight local models as coding agents on 8 GB, from the study predating this repo. **Frozen**: a record of finished work. New measurements go to `docs/dev.md` or a ticket |
 | `backlog/` | living | one file per ticket, `T-NNN-{slug}.md`, indexed in `backlog.md` with the `Next ticket` counter. A private one gets `.local.md` and stays out of the repo, so the numbers have gaps |

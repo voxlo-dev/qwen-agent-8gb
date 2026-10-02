@@ -67,6 +67,8 @@ bonsai-pi            # terminal 2
 
 `bonsai-pi` is a separate pi instance, so a pi you use with other models keeps its own settings. The server is also a plain OpenAI-compatible endpoint at `http://127.0.0.1:8080/v1`, model `bonsai-27b`.
 
+If you use [Unsloth Studio](https://github.com/unslothai/unsloth), `bonsai-studio` opens the same model in it, on this repo's build and with the same window, placement and reasoning flags, instead of the values Studio would pick itself. Studio serves its chat UI and an API with its own key at `http://127.0.0.1:8888`; arguments go to `unsloth studio run` (for example `--port`), and `--print` shows the command. Details: [docs/dev.md](docs/dev.md#unsloth-studio).
+
 `bonsai-pi --localagent` starts a highly experimental multi-agent workflow that is **not recommended** yet and performs worse, we're working on it: [docs/localagent.md](docs/localagent.md#status).
 
 ## Why it is interesting
@@ -136,10 +138,10 @@ work that is already done:
 | Step | Does |
 | --- | --- |
 | `deps` | apt toolchain for `BACKEND`: build tools, cmake, then gcc-13 and the CUDA toolkit (kept as is when an `nvcc` >= 12.4 is already installed), or glslc and the Vulkan headers (asks for sudo, so run it in a real terminal) |
-| `build` | clones the fork at the pinned commit, applies `patches/$BACKEND/`, builds `llama-server` (`FORCE=1` rebuilds) |
+| `build` | fetches the model's llama.cpp tree at its pin (a git commit, or for Qwen3.8-Flash Unsloth's source tarball, checksummed), applies `patches/$BACKEND/`, builds `llama-server` (`FORCE=1` rebuilds) |
 | `model` | links the GGUF from the Hugging Face cache, or downloads and checksums it |
 | `pi` | installs its own pinned pi and writes its config: provider `local` as default, the context budget, `AGENTS.md`. A pi you already have and `~/.pi` stay untouched |
-| `link` | puts `bonsai-server` and `bonsai-pi` into `~/.local/bin` |
+| `link` | puts `bonsai-server`, `bonsai-pi` and `bonsai-studio` into `~/.local/bin` |
 
 `BACKEND` has to be set for every later `./install.sh build` too (or exported): `build` decides on it which toolchain to use and which patches from [`patches/`](patches/) to apply. `bonsai-server` reads it as well.
 
@@ -201,6 +203,7 @@ bonsai-server --port 9000
 | --- | --- | --- |
 | `MODEL` | `bonsai` | `bonsai`, `qwen36-35b` or `qwen38-flash`, see [A second model](#a-second-model-experimental) |
 | `BACKEND` | `cuda` | `cuda` or `vulkan`; read by `deps`, `build` and `bonsai-server`. `build` rebuilds by itself when it changes |
+| `CUDA_ARCH` | the card's | CUDA architecture `build` compiles for, e.g. `89`; set it to build where `nvidia-smi` sees no card |
 | `BUILD_JOBS` | auto | parallel compile jobs; empty derives them from free RAM and core count, see [RAM and build memory](docs/dev.md#ram-and-build-memory) |
 | `CTX` | `64000` | context window in tokens (profile); the most 8 GB holds at the default cache types. 96k fits with `q4_0`/`q4_0`, see [Context window](docs/context-window.md) |
 | `KV_K` / `KV_V` | `q8_0` / `q4_0` | KV cache types for keys and values; measured against `f16` in [Context window](docs/context-window.md#kv-cache-quality) |
@@ -217,6 +220,7 @@ bonsai-server --port 9000
 | `PI_VERSION` | `0.85.1` | pi version the context budget was measured with |
 | `SERVER_AUTOSTART` | `true` | let `bonsai-pi` start and stop the server |
 | `SERVER_START_TIMEOUT` | `300` | seconds `bonsai-pi` waits for the model to load |
+| `UNSLOTH_CLI` | Studio's venv | the `unsloth` command `bonsai-studio` runs; falls back to one on `PATH` |
 
 After changing the profile, `CTX`, `SERVER_HOST`, `PORT`, `MAX_TOKENS`, `RESERVE_TOKENS` or `KEEP_RECENT_TOKENS`, run `./install.sh pi` again so pi's config matches the server.
 
@@ -229,7 +233,7 @@ a mixture-of-experts model whose experts live in system RAM while the card holds
 same 4060 Ti it runs a 131k window at 39-45 tok/s on natural output under WSL2, with multi-token
 prediction, and at 52-65 tok/s on native Linux.
 It needs **~28 GB of RAM** (under WSL2, raise `memory=` in `%UserProfile%\.wslconfig`), 22 GB of
-disk, and a mainline llama.cpp build next to the fork. On the RX 570 it runs too, at
+disk, and a second llama.cpp build next to the fork: Unsloth's, from its pinned source, mainline on Vulkan. On the RX 570 it runs too, at
 2.5-3.5x Bonsai's speed there, ~22 tok/s at 131k. In its one agent session so far it built the
 study's Tron game in 7 minutes, with rematch broken: [docs/qwen.md](docs/qwen.md#in-an-agent-session).
 
@@ -243,11 +247,12 @@ not touch the other one's settings or sessions.
 
 `MODEL=qwen38-flash` goes further: [Qwen3.8-Flash-Next](https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF),
 125B, every expert in RAM, a 131k window at **~19 tok/s and prompts at ~100 tok/s on native Linux**
-with a lean desktop, 9-10 and ~36 under WSL2. A side experiment, not tried as an agent yet. It
+with a lean desktop, 9-10 and ~36 under WSL2. A side experiment, with one agent session so far
+([how it went](docs/qwen.md#qwen38-flash-in-an-agent-session)). It
 needs **~48 GB of RAM** to run and **~58 GB available** to keep every expert cached, which a 64 GB
 PC reaches on native Linux with the browser and editors closed ([why](docs/qwen.md#native-linux)),
-88 GB of disk, an 8 GB card that drives no display, and [Unsloth Studio](https://github.com/unslothai/unsloth)
-installed: it runs on Unsloth's prebuilt llama.cpp, since mainline runs out of VRAM on its sparse
+88 GB of disk and an 8 GB card that drives no display. It runs on Unsloth's llama.cpp, which
+`build` compiles from Unsloth's pinned source, since mainline runs out of VRAM on its sparse
 attention. Details in [docs/qwen.md](docs/qwen.md#qwen38-flash-125b-experimental).
 
 ## Performance
@@ -314,7 +319,7 @@ one rule, which is that a non-default choice arrives with the measurement that j
 ## Uninstall
 
 ```bash
-rm -rf ~/.local/share/bonsai-local ~/.local/bin/bonsai-server ~/.local/bin/bonsai-pi
+rm -rf ~/.local/share/bonsai-local ~/.local/bin/bonsai-server ~/.local/bin/bonsai-pi ~/.local/bin/bonsai-studio
 ```
 
 That includes pi and its sessions. The build cache in `~/.cache/ccache` and the apt packages from

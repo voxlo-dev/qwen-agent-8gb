@@ -6,8 +6,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/scripts/lib.sh"
 
 link() {
   mkdir -p "$HOME/.local/bin"
-  for b in bonsai-server bonsai-pi; do ln -sf "$ROOT/bin/$b" "$HOME/.local/bin/$b"; done
-  log "linked bonsai-server and bonsai-pi into ~/.local/bin"
+  for b in bonsai-server bonsai-pi bonsai-studio; do ln -sf "$ROOT/bin/$b" "$HOME/.local/bin/$b"; done
+  log "linked bonsai-server, bonsai-pi and bonsai-studio into ~/.local/bin"
   [[ ":$PATH:" == *":$HOME/.local/bin:"* ]] || warn "~/.local/bin is not on PATH"
 }
 
