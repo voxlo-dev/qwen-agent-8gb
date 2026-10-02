@@ -1,47 +1,52 @@
-# T-017 — Hand the PTQ1_0 Vulkan decode to the fork's issue #185
+# T-017 — Upstream: a pin that makes the Vulkan patch, and then the fork, unnecessary
 
-- **Summary:** Post the T-016 result and patch link as a comment on PrismML-Eng/llama.cpp#185, and drop `patches/vulkan/` once a pinned commit carries an equivalent decode, from whoever lands it
-- **Category:** chore
+- **Summary:** Watch the fork (#185, #252) and mainline (ggml-org#29077) for a PTQ1_0 decode that makes `patches/vulkan/` unnecessary, and for mainline support that makes the fork pin unnecessary. Either event: move the pin, re-measure on both cards, drop what is no longer needed
+- **Category:** decision
 - **Importance:** medium
-- **Effort:** S
-- **Depends on:** none (T-016 closed; patch in `patches/vulkan/0001-ptq1_0-table-decode.patch`)
+- **Effort:** S per event, waiting in between
+- **Depends on:** upstream. Merges T-029 (watch mainline)
 
 ## Why
 
-T-016 rewrote the fork's PTQ1_0 Vulkan decode: 633 → 143 ms/token generation and 36 → 54 tok/s
-prompt on an RX 570, bit-exact against the CPU backend. Issue
-[#185](https://github.com/PrismML-Eng/llama.cpp/issues/185) is where that belongs.
+Bonsai needs two things mainline llama.cpp does not have: ggml type 143 (`PTQ1_0`), which is why
+`LLAMA_COMMIT` pins PrismML's fork, and a fast Vulkan decode for it, which is why `build` applies
+`patches/vulkan/0001-ptq1_0-table-decode.patch` (T-016: 633 → 143 ms/token and 36 → 54 tok/s
+prompt on the RX 570, bit-exact against the CPU backend). Both are being fixed upstream, and each
+fix makes something here a liability.
 
-**Decided 2026-09-21: a comment, not a PR.** Two PRs were already open on 2026-09-18:
-[#188](https://github.com/PrismML-Eng/llama.cpp/pull/188) (integer-dot mat-vec kernel, mergeable,
-does not run on cards without `VK_KHR_shader_integer_dot_product` such as gfx803) and
-[#187](https://github.com/PrismML-Eng/llama.cpp/pull/187) (same table idea in a weaker form, ~1.2x
-on the generic path per the BC-250 numbers in #188, bundled into a conflicting +23k-line PR).
-The fork's `CONTRIBUTING.md` closes duplicates and requires the author to explain and maintain
-every line without AI help; the patch was written with Claude and that bar is not met. A
-comment hands the measurement and the patch to the people who can, at no cost.
+**Done on the fork side.** Decided 2026-09-21: a comment, not a PR (two PRs were ahead, and the
+fork's `CONTRIBUTING.md` needs an author who can defend every line without AI help). Posted as
+<https://github.com/PrismML-Eng/llama.cpp/issues/185#issuecomment-5759986235> under `voxlo-dev`;
+its patch link points at `main` of this repo, so the file stays at that path. On 2026-09-24 the
+maintainer pointed at #252 (dedicated PTQ1_0 `mul_mat_vec` for cards without integer dot).
+Measured on the RX 570 (`runs/T-017-pr252-rx570/`, [dev.md](../docs/dev.md#other-gpu-backends)):
+#252 matches the patch on generation, so only its `mul_mm` half (+50 % on prompts) is still
+unique. Comment texts for #252 and the correction on #185 are in that run folder.
+`upstream-pr-body.md` and `upstream-commands.sh` in `runs/T-016-ptq1_0-vulkan-decode/` are the PR
+path, kept in case the decision is revisited.
 
-## What
+## What, when it happens
 
-1. **Done 2026-09-21:** posted as https://github.com/PrismML-Eng/llama.cpp/issues/185#issuecomment-5759986235 (text in `runs/T-016-ptq1_0-vulkan-decode/issue-185-comment.md`,
-   under `voxlo-dev`). The patch link points at
-   `main` of the public repo, so the file must stay at that path.
-2. Watch #185, #187, #188 occasionally. Answer questions with measurements, not code.
-   **2026-09-24:** the maintainer answered on #185: #238 (integer-dot mat-vec, in release
-   `842b188`) does not reach gfx803, and pointed at #252 (dedicated PTQ1_0 `mul_mat_vec`) for
-   cards without integer dot. Tested on the RX 570 (`runs/T-017-pr252-rx570/`, numbers in
-   `docs/dev.md#other-gpu-backends`): #252 matches the T-016 generation speed, so only the
-   patch's `mul_mm` half (+50 % on prompts) is still unique. The same run showed T-016's
-   prompt "before" of 3.8 tok/s was wrong (36). Comment texts for #252 and the correction on
-   #185 are in the run folder.
-3. When a pinned commit carries a decode that makes the patch unnecessary (from any of the
-   three): move `LLAMA_COMMIT`, re-run the CUDA build and the RX 570 measurement
-   (`runs/T-016-ptq1_0-vulkan-decode/measure.sh`), delete `patches/vulkan/`, and drop the patch
-   mentions from `README.md`, `AGENTS.md` and `docs/dev.md#other-gpu-backends`. If the new
-   decode is slower than 143 ms/token on the RX 570, keep the patch and rebase it instead.
-   If the pin carries #252 but not a faster `mul_mm` loader, decide whether +50 % on prompts is
-   worth keeping a patch for; if yes, cut it down to the `mul_mm` half.
+**Watch**, occasionally: fork #185, #187, #188, #252; mainline #29077 (PQ2_0/PTQ1_0 types) and
+#22019. Answer questions with measurements, not code. Record merge commits here.
+
+**A fork commit carries an equivalent decode** (#252 or another):
+
+1. Move `LLAMA_COMMIT`, run the CUDA build, and the RX 570 measurement
+   (`runs/T-016-ptq1_0-vulkan-decode/measure.sh`).
+2. Generation no slower than 143 ms/token and prompts as fast: delete `patches/vulkan/`, and the
+   patch mentions in `README.md`, `AGENTS.md` and `docs/dev.md#other-gpu-backends`.
+3. #252 without a faster `mul_mm` loader: decide whether +50 % on prompts is worth a patch; if
+   yes, cut it down to the `mul_mm` half. Slower: keep the patch and rebase it.
+
+**Mainline takes PTQ1_0** (#29077 merged):
+
+1. Mainline at that commit: `PTQ1_0` loads, CUDA speed on the 4060 Ti against 36.6 tok/s,
+   `patches/vulkan/` applies, RX 570 against 143 ms/token.
+2. Decide Bonsai's `LLAMA_COMMIT`: fork or mainline. Mainline would let Bonsai share Qwen3.6's
+   tree. Either way `build` must stop applying a patch the tree already contains
+   (`git apply --check` before applying, or a stamp).
+3. README: a "stock llama.cpp / Ollama / LM Studio" paragraph for people who only want the
+   server; `bonsai-pi` and the profiles are what remains of this repo's value.
 
 Not in scope: the dedicated PTQ1_0 mat-vec kernel (ceiling ~22 tok/s on the RX 570).
-`upstream-pr-body.md` and `upstream-commands.sh` in the run folder are the PR path, kept in
-case the decision is revisited.

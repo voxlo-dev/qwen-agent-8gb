@@ -20,7 +20,7 @@ incomplete, and a change that contradicts one needs a new measurement, not an ar
 | Path | Role |
 | --- | --- |
 | `config.env` | **Single source of truth.** Every setting, with `: "${VAR:=default}"` so an environment variable always wins. Sources the profile, then the model file |
-| `models/{bonsai,qwen36-35b}.env` | Per `MODEL` (default `bonsai`): the GGUF pin, the llama.cpp tree that runs it (`LLAMA_*`, `PATCH_DIR`), KV types, `EFFORT`, `SPEC_TYPE`, and what preflight checks (disk, RAM, backends) |
+| `models/{bonsai,qwen36-35b,qwen38-flash}.env` | Per `MODEL` (default `bonsai`): the GGUF pin, the llama.cpp tree that runs it (`LLAMA_*`, `PATCH_DIR`), KV types, `EFFORT`, `SPEC_TYPE`, and what preflight checks (disk, RAM, backends); `SERVER_ARGS` for flags no setting covers |
 | `profiles/{model}/{dedicated,display}.env` | `CTX` and the four budget values, per model and GPU situation (`PROFILE`, default `dedicated`); for the MoE also `CPU_MOE` and `UB`. They constrain each other, so they move together |
 | `install.sh` | Step runner: `deps build model pi link`, all of them by default. Runs `preflight` first |
 | `scripts/preflight.sh` | Gates a run before it spends time: disk, RAM, driver, VRAM, Node, port. Reports every item, exits once. `SKIP_PREFLIGHT=1` bypasses it |
@@ -108,7 +108,7 @@ Every fact has one home, chosen by how long it stays true.
 | `docs/dev.md` | durable | why each non-default choice is what it is, with its measurement, plus troubleshooting. Also this project's decisions log |
 | `docs/performance.md` | durable | what limits generation speed: the bandwidth roofline, and the optimizations tried and rejected |
 | `docs/context-window.md` | durable | the window and the KV cache for both models: what fits on 8 GB, the silent WSL2 spill, KV quality against f16 |
-| `docs/qwen.md` | durable | the second model: why a MoE, the offload/MTP/fork-or-mainline measurement, its profiles, the Qwen 4 slot |
+| `docs/qwen.md` | durable | the MoE models: why a MoE, the offload/MTP/fork-or-mainline measurement, their profiles, Qwen3.8-Flash with every expert in RAM, the Qwen 4 slot |
 | `docs/localagent.md` | durable | the frozen workflow: why it is not recommended, its shape, how it runs on pi, the measured runs |
 | `docs/model-comparison.md` | durable | eight local models as coding agents on 8 GB, from the study predating this repo. **Frozen**: a record of finished work. New measurements go to `docs/dev.md` or a ticket |
 | `backlog/` | living | one file per ticket, `T-NNN-{slug}.md`, indexed in `backlog.md` with the `Next ticket` counter. A private one gets `.local.md` and stays out of the repo, so the numbers have gaps |

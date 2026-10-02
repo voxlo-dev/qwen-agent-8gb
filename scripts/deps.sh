@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: MIT
 # Installs the build toolchain via apt for BACKEND (cuda or vulkan). Needs sudo, so run it from a
-# real terminal. CUDA is tested on Ubuntu 26.04, Vulkan on Debian 13; other systems bring the
+# real terminal. CUDA is tested on Ubuntu 26.04, Vulkan on Debian 13; where apt's CUDA is older
+# than 12.4 (Ubuntu 24.04) it keeps an nvcc from NVIDIA's repository. Other systems bring the
 # toolchain themselves, see docs/dev.md#toolchain.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
@@ -10,7 +11,19 @@ case "$BACKEND" in
     has nvidia-smi || die "nvidia-smi not found - install the NVIDIA driver (under WSL2: on the Windows side)"
     has apt-get || die "no apt-get - install CUDA >= 12.4, a matching gcc, cmake, git, python3 yourself, then: ./install.sh build model pi link"
     # gcc-13 is the CUDA host compiler: nvcc 12.x rejects the newer distro default gcc
-    pkgs=(build-essential cmake ccache git curl python3 gcc-13 g++-13 nvidia-cuda-toolkit)
+    pkgs=(build-essential cmake ccache git curl python3 gcc-13 g++-13)
+    # An nvcc >= 12.4 from anywhere (NVIDIA's repository, a runfile) is used as it is. Otherwise
+    # apt's toolkit, but only where apt has one that new: Ubuntu 24.04 offers 12.0, 22.04 11.5,
+    # Debian 13 none in main. See docs/dev.md#cuda-from-nvidias-repository.
+    have="$(nvcc_version)"
+    if [[ -n "$have" ]] && version_ge "$have" 12.4; then
+      log "using the installed nvcc $have"
+    else
+      cand="$(apt_cuda_version)"
+      [[ -n "$cand" ]] && version_ge "$cand" 12.4 \
+        || die "apt offers CUDA ${cand:-nothing} here (nvidia-cuda-toolkit)${have:+ and nvcc $have is installed}, the build needs >= 12.4 - install cuda-toolkit-12-9 from NVIDIA's repository, then run ./install.sh again: docs/dev.md#cuda-from-nvidias-repository"
+      pkgs+=(nvidia-cuda-toolkit)
+    fi
     ;;
   vulkan)
     ls /dev/dri/renderD* >/dev/null 2>&1 || die "no /dev/dri/renderD* - no GPU render node; install the kernel driver (amdgpu) first"

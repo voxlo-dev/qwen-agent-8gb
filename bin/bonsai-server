@@ -10,6 +10,9 @@ source "$ROOT/config.env"
 [[ -x "$LLAMA_SERVER" ]] || { echo "llama-server not found at $LLAMA_SERVER - run ./install.sh" >&2; exit 1; }
 [[ -f "$MODEL_PATH" ]] || { echo "model not found at $MODEL_PATH - run ./install.sh model" >&2; exit 1; }
 
+# A prebuilt llama.cpp may need its runtime on the library path; see config.env.
+if [[ -n "$LLAMA_LIB_PATH" ]]; then export LD_LIBRARY_PATH="$LLAMA_LIB_PATH${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"; fi
+
 if [[ "$BACKEND" == vulkan ]]; then
   # RADV puts buffers in GTT although VRAM is free; this keeps the compute buffer in VRAM,
   # worth 1.22x on this model. Needs Mesa >= 25.2, silently ignored below.
@@ -42,6 +45,7 @@ if [[ -n "$EFFORT" ]]; then args+=(--reasoning-effort "$EFFORT"); fi
 args+=(--reasoning-budget "$BUDGET" --reasoning-budget-message "$BUDGET_MSG"
   "$PRESERVE_THINKING_FLAG")
 if [[ -n "$SPEC_TYPE" ]]; then args+=(--spec-type "$SPEC_TYPE"); fi
+if [[ -n "$SERVER_ARGS" ]]; then read -ra extra <<<"$SERVER_ARGS"; args+=("${extra[@]}"); fi
 args+=(--temp 1.0 --top-p 0.95 --top-k 20 --min-p 0.0)
 
 exec "$LLAMA_SERVER" "${args[@]}" "$@"

@@ -31,19 +31,31 @@ Architecture (`qwen35`): 64 blocks, every 4th is full attention (16 layers, 4 KV
 
 ## Toolchain
 
-`./install.sh deps` takes everything from apt and is tested on Ubuntu 26.04 only, where
-`nvidia-cuda-toolkit` is CUDA 12.4. Known limits beyond that, not yet tested on a machine
-(see the backlog):
+`./install.sh deps` takes everything from apt, except an `nvcc` >= 12.4 that is already there,
+which it keeps. What that means per system, as of a fresh native install on 2026-09-29 (T-004,
+T-005, T-006):
 
-- **Other Ubuntu releases:** 24.04 ships CUDA 12.0, whose `nvcc` accepts gcc up to 12, not the
-  gcc-13 the build picks. 22.04 ships CUDA 11.5, which does not know `sm_89` (Ada), and has no
-  `gcc-13` package.
+- **Ubuntu 26.04:** `nvidia-cuda-toolkit` is CUDA 12.4; `deps` installs it. The reference machine
+  (WSL2) runs this.
+- **Ubuntu 24.04, and what is built on it** (Linux Mint 22.x, measured on 22.3 native): apt offers
+  CUDA 12.0, whose `nvcc` accepts gcc up to 12, not the gcc-13 the build picks. `deps` and
+  preflight check the candidate before installing anything and stop with the way out:
+  [CUDA from NVIDIA's repository](#cuda-from-nvidias-repository). With that toolkit in place
+  `./install.sh` runs through, and serves at 36.6 tok/s, the same as under WSL2.
+- **Ubuntu 22.04** (CUDA 11.5, no `sm_89`, no `gcc-13`) and **Debian 13** (`nvidia-cuda-toolkit`
+  only in `contrib`, which the image does not enable) are not run. They meet the same check: apt
+  offers < 12.4 or nothing, so `deps` stops at once rather than deep in apt or nvcc. On 22.04 the
+  NVIDIA route also needs `gcc-13` dropped from `deps`' list; nobody has asked for it.
 - **RTX 50xx** (`sm_120`) needs CUDA >= 12.8, i.e. NVIDIA's own repository. `build.sh` stops
   early when the GPU is newer than the installed `nvcc`.
-- **Native Linux:** apt's toolkit pulls in `libnvidia-compute-*` of its own version. Under WSL2
-  that is harmless - `ldd llama-server` resolves `libcuda.so.1` to `/usr/lib/wsl/lib`, which
-  comes first in the loader path. Next to a native driver of another version it can cause a
-  driver/library version mismatch.
+- **Native Linux next to a distro driver:** neither toolkit touches it. Simulated against
+  `nvidia-driver-595-open` on 24.04: Ubuntu's `nvidia-cuda-toolkit` installs 93 packages and
+  removes none, its `libcuda.so.1` dependency is met by the installed `libnvidia-compute-595`;
+  NVIDIA's `cuda-toolkit-12-9` (71) and `13-4` (66) pull no driver package at all. The risk is
+  elsewhere: NVIDIA's repository carries newer `dkms`, `nvidia-settings` and
+  `libnvidia-egl-wayland1`, which a plain `apt upgrade` would take. Hence the pin below. Under
+  WSL2 the question does not arise: `ldd llama-server` resolves `libcuda.so.1` to
+  `/usr/lib/wsl/lib`, first in the loader path.
 - **AMD through Vulkan** (`BACKEND=vulkan`): `deps` is tested on Debian 13 - `glslc`,
   `libvulkan-dev`, `mesa-vulkan-drivers`, `vulkan-tools`; the package names are the same on
   Ubuntu. It gates on a `/dev/dri/renderD*` node and on `vulkaninfo` seeing a device, which
@@ -53,10 +65,61 @@ Architecture (`qwen35`): 64 blocks, every 4th is full attention (16 layers, 4 KV
   ROCm/HIP and Metal kernels; untested. [Other GPU backends](#other-gpu-backends) has what
   Vulkan delivers and why.
 
-Disk, measured: model 5.6 GB, `llama.cpp` checkout and build 1.9 GB, ccache ~0.25 GB, apt's
-CUDA toolkit with its dependencies ~5.4 GB. The binary links `libcudart` and `libcublas`
-dynamically, so the toolkit stays after the build. pi needs Node.js >= 22.19 (`engines` in its
-`package.json`) and takes 440 MB in `$BONSAI_HOME/pi`.
+**Node.js >= 22.19** for pi (`engines` in its `package.json`) comes from apt on Ubuntu 26.04 only:
+24.04 ships 18.19, Debian 13 20.19. nvm is the tested source (v24.21 on Mint 22.3); it reaches
+only shells that read `~/.bashrc`, so a distro Node left in `/usr/bin` still wins elsewhere, and
+preflight says which one it found. NodeSource works the same way through apt. pi takes 440 MB in
+`$BONSAI_HOME/pi`.
+
+Disk, measured: model 5.6 GB, `llama.cpp` checkout and build 1.3-1.9 GB, ccache ~0.25 GB, pi
+0.44 GB. The toolkit: ~5.4 GB from apt, 7.3 GB for NVIDIA's `cuda-toolkit-12-9`, whose Nsight
+tools also pull a Java runtime. The binary links `libcudart` and `libcublas` dynamically, so the
+toolkit stays after the build. A fresh native install came to ~15 GB with NVIDIA's toolkit.
+
+### CUDA from NVIDIA's repository
+
+Where apt's CUDA is older than 12.4 (Ubuntu 24.04 and its derivatives), or for an RTX 50xx:
+
+```bash
+wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb
+sudo dpkg -i cuda-keyring_1.1-1_all.deb
+# Only for what Ubuntu does not have: keeps apt upgrade off NVIDIA's dkms and nvidia-settings
+printf 'Package: *\nPin: origin developer.download.nvidia.com\nPin-Priority: 100\n' \
+  | sudo tee /etc/apt/preferences.d/cuda-repo-pin
+sudo apt-get update
+sudo apt-get install -y cuda-toolkit-12-9
+./install.sh
+```
+
+`cuda-toolkit-12-9`, not `cuda`: the metapackage brings NVIDIA's driver along, on top of the one
+the distro installed. 12.9 rather than 13.x because every CUDA number here was measured on 12.x.
+The toolkit lands in `/usr/local/cuda/bin`, which no shell has on its `PATH`; `lib.sh` adds it
+when `nvcc` is not found otherwise, so no `~/.bashrc` edit is needed. With the pin,
+`apt list --upgradable` stays empty of NVIDIA packages; without it, it listed four.
+
+### Secure Boot
+
+On native Linux with Secure Boot on, the kernel loads the NVIDIA module only if its signature
+key is enrolled in the firmware (MOK). DKMS signs the module, but nothing enrolls the key, so
+after an install the driver packages are all there, `dkms status` says `installed`, and
+`nvidia-smi` only reports that it "couldn't communicate with the NVIDIA driver". preflight names
+this case. `mokutil --test-key /var/lib/shim-signed/mok/MOK.der` says whether the key is enrolled.
+
+Found on Linux Mint 22.3, where the key in `/var/lib/shim-signed/mok/` predated the install by
+nearly nine months (`CN=localhost.localdomain`): it came with the image, so its private half is likely
+the same on every install from it. Make a key of your own before enrolling one:
+
+```bash
+sudo mkdir -p /root/mok.iso && sudo mv /var/lib/shim-signed/mok/MOK.* /root/mok.iso/
+sudo update-secureboot-policy --new-key
+sudo dpkg-reconfigure nvidia-dkms-595-open      # rebuilds and signs with the new key
+sudo mokutil --import /var/lib/shim-signed/mok/MOK.der
+sudo reboot    # MOK Manager: Enroll MOK, Continue, Yes, the password (US layout), Reboot
+```
+
+An installer that probes the GPU, Unsloth Studio's among them, has to run after this: before it,
+Unsloth saw only the iGPU and installed CPU torch and the Vulkan llama.cpp build, which
+`build` now refuses for a CUDA model.
 
 ## Windows
 
@@ -88,9 +151,11 @@ Git Bash or MSYS2 is not the shortcut it looks like: `nvidia-smi` and cmake run 
 
 Against roughly 700 lines of PowerShell, a second test matrix and a second set of measurements,
 the gain is that a Windows user does not run `wsl --install`. The one argument with substance is
-speed - native would not pay the WSL2 passthrough - and it is unmeasured; the host-side comparison
-in [Performance](performance.md#what-is-left) found nothing that puts 36 tok/s in question. If a
-measurement ever shows a real gap, this is the entry it reopens.
+speed - native would not pay the WSL2 passthrough. For Bonsai it is measured now and there is none:
+36.6 tok/s on native Linux against 36 under WSL2. For the MoE models there is, 30-100 %, because
+their experts are read from host memory ([qwen.md](qwen.md#native-linux)). That gap argues for
+native Linux, which this repo already supports, not for a native Windows port, which is unmeasured
+and would pay its own costs; it is what a measurement on native Windows would have to beat.
 
 ## Other GPU backends
 
@@ -422,6 +487,11 @@ beat many small ones here: half the steps of the 4096 run, in the same time, for
 that holds up. The 64k run's closest approach to pi's clamp left 5 372 tokens of margin, so
 the trigger was never the limit.
 
+**The 4096 stays.** pi's `CONTEXT_SAFETY_TOKENS` is a constant in its bundle. Shrinking it means
+patching a pinned dependency, which `PI_VERSION` would then no longer describe, or asking pi for a
+setting. With 5 372 tokens of margin in the run above, ~3k more working room per compaction cycle
+is not worth either. Revisit only if a profile runs tighter than that (closed as T-015).
+
 The 4096 re-run (session `2026-09-19T19-16-01`): 168 steps in
 112 minutes, and the run ended on its own (`stopReason: stop`) with no step cut off on
 `length`. 7 compactions, 8-33 steps apart, back at 14.5-19.4k each time. 6 steps hit the
@@ -451,7 +521,7 @@ Logs and `evaluate.sh`: `runs/T-035-bonsai-measured/day/` on the 4060 Ti machine
 the game was written in 20 minutes, then the model built its own test harness, a headless DOM in
 Node's `vm`, and spent from minute 58 to ~108 on one nested-quote escape in it (with `xxd`, `cmp`
 and scratch files), and the next 50 minutes on the harness again. It never went back to the game.
-Nothing in the log points at the window, so **64k stays `dedicated` for now**, and T-035 runs a
+Nothing in the log points at the window, so **64k stays `dedicated` for now**, and T-041 runs a
 second pair before that is final. The harness rabbit hole is also what the
 [agent prompt](#the-agent-prompt) now speaks to.
 
@@ -508,7 +578,7 @@ situation with the reason for each point, not as rules, and that is a measured c
 The first version (until 2026-09-27) was four imperatives: think short, one step per turn, no
 restating, minimal tool arguments. None of it was ever measured against no file at all. The
 current one is unmeasured too; its reading is the next Tron pair in
-[T-035](../backlog/T-035-bonsai-measured.md).
+[T-041](../backlog/T-041-tron-day-2.md).
 
 ## pi
 
@@ -634,20 +704,24 @@ because the two expensive steps come first and fail last: a CUDA build is 10 to 
 model is 5.6 GB, so a missing driver, a full disk or a 6 GB card used to be discovered after half
 an hour of work rather than before it.
 
-It checks the distro, free disk against what the named steps will actually write, `MemAvailable`,
-the driver for `BACKEND`, total and used VRAM, Node for the `pi` step, and whether something is
-already answering on `PORT`. Three properties matter:
+It checks the distro (a derivative by its base, from `ID_LIKE` and `UBUNTU_CODENAME`), free disk
+against what the named steps will actually write (a model in the Hugging Face cache costs
+nothing), `MemAvailable`, the driver for `BACKEND` (on native Linux, a module that Secure Boot
+kept out), the CUDA toolchain the run will use (the installed `nvcc`, or the version apt would
+install), `cmake` and `git` for a build without `deps`, total and used VRAM, Node for the `pi`
+step (and whether nvm has a newer one off the `PATH`), and whether something is already answering
+on `PORT`. Three properties matter:
 
 - **It reports every item and exits once.** A list of five problems takes one pass to fix; five
   runs that each die on the next one take five.
 - **It checks only the steps being run.** `./install.sh model link` needs no GPU at all, which is
   how a server on another machine gets set up, so the driver checks are skipped there.
 - **Warnings do not stop it.** Low RAM, an unmeasured distro, a busy port: these are things to
-  know, not things to block on. Only a missing driver, too little disk, a card below 8 GB or a
-  Node too old for pi are hard failures.
+  know, not things to block on. Only a missing driver, too little disk, a CUDA older than 12.4, a
+  missing build tool, a card below 8 GB or a Node too old for pi are hard failures.
 
 `SKIP_PREFLIGHT=1` bypasses it. The failure message says so, because the checks encode what was
-true on two machines and should not be the thing that stops a third.
+true on three machines and should not be the thing that stops a fourth.
 
 VRAM in use above 400 MiB is a warning rather than a failure: it usually means a desktop is on the
 card, which is what `PROFILE=display` is for, but it can equally be another model server that will
@@ -674,6 +748,11 @@ be gone by the time this one starts. See [VRAM budget](#vram-budget).
 | Vulkan: VRAM reads a few MiB right after load | Normal. RADV moves the weights into VRAM on the first request. Judge by tok/s, and read VRAM and GTT together. |
 | Vulkan: ~2x slower, VRAM ~20 MiB, GTT ~6 GB | `GGML_VK_PREFER_HOST_MEMORY` is set. It is checked for presence, so `=0` also turns it on: unset it. |
 | `vulkaninfo` lists no device, `deps` dies on it | Your user is not in the `render` group: `usermod -aG render $USER`, log in again. |
+| `nvidia-smi` "couldn't communicate with the NVIDIA driver", native Linux | Secure Boot refused the module: its key is not enrolled. See [Secure Boot](#secure-boot). |
+| `apt offers CUDA 12.0 here` from `deps` or preflight | Ubuntu 24.04 or a derivative. Install [CUDA from NVIDIA's repository](#cuda-from-nvidias-repository), then `./install.sh`. |
+| `cmake: command not found` in `build` | `deps` was skipped. Run it, or install `cmake` yourself; preflight now says so first. |
+| `node: v18... - nvm has v24...` | nvm is loaded by `~/.bashrc` only. Run from an interactive shell, or `source ~/.nvm/nvm.sh`. |
+| `prebuilt ... has no CUDA backend` from `build` (Qwen3.8-Flash) | Unsloth was installed before the NVIDIA driver worked and chose Vulkan or CPU. Repair it in Studio. |
 | `preflight: N problem(s)` | Each line above it says what and how. `SKIP_PREFLIGHT=1 ./install.sh` goes ahead anyway. |
 | `preflight` warns that VRAM is already in use | A desktop or another server is on the card. `PROFILE=display`, or free it. See [VRAM budget](#vram-budget). |
 | `download failed` from `model` | Run `./install.sh model` again; `curl -C -` resumes from the `.part` file. |

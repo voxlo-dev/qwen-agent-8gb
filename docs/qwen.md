@@ -4,11 +4,15 @@
 35B parameters, 3B of them active per token. The experts live in system RAM; the card holds
 attention, the shared expert, the KV cache and the MTP head. **Experimental**: measured for speed
 and KV quality, and in one agent session, where it built the study's game in 7 minutes with one
-feature broken ([below](#in-an-agent-session)). Whether that ships it as supported is open (T-034).
+feature broken ([below](#in-an-agent-session)). Whether that ships it as supported is open (T-041).
 Bonsai stays the default.
 
 It is also the slot for Qwen 4. If a Qwen 4 35B-A3B ships, it becomes a model file of its own plus
 one re-run of the measurement below. The code does not change.
+
+A third, `MODEL=qwen38-flash`, runs the 125B Qwen3.8-Flash-Next with every expert in RAM, at
+~19 tok/s on a 64 GB machine under native Linux, ~10 under WSL2: [below](#qwen38-flash-125b-experimental).
+Both MoE models are 30-100 % faster on native Linux: [Native Linux](#native-linux).
 
 ## Why a MoE, and why this one
 
@@ -69,7 +73,8 @@ config with the model card's sampling. That gives **29.0 tok/s without MTP and 3
 28.5, with one expert layer fewer on the card for mainline, which needs ~120 MiB more VRAM; pp is
 the same. MTP adds 33-54 % on natural output and still 25 % at 112k of context. It costs ~1.66 GB of
 VRAM, paid in expert layers and ubatch, which puts pp at ~700 instead of ~1 050. The fork cannot
-draft at all. This is also the path a Qwen 4 will need: mainline knows `qwen4exp` (the architecture
+draft at all. `SPEC_TYPE=none` turns it off; an empty `SPEC_TYPE` does not, since the model file
+fills an empty value with its default. This is also the path a Qwen 4 will need: mainline knows `qwen4exp` (the architecture
 of `Qwen/Qwen3.8-Flash-Next`), the fork does not.
 
 **131 072 tokens, `q8_0`/`q8_0`.** With MTP, tg at 43k is 32.2-33.6 across every window from 65k to
@@ -218,9 +223,8 @@ follows.** The knobs tried around it:
 - **One CPU thread fewer is worth ~10 %.** With every expert in RAM, 8 threads on the VM's 8 vCPUs
   compete with the thread that drives the GPU. A 256-token turn without MTP: `-t 8` 17.2 and
   17.1, `-t 7` 18.9 and 19.0, `-t 6` 19.0 and 17.9, `-t 5` 19.4, `-t 4` 18.8. Not a default: it is
-  one VM's core count, and the 4060 Ti machine, where Qwen is bounded by RAM, may well behave
-  similarly. That is [T-037](../backlog/T-037-moe-cpu-threads.md). Until then, pass `-t` to
-  `bonsai-server` by hand.
+  this VM's, and on the 4060 Ti machine under native Linux it reverses
+  ([Native Linux](#native-linux)). On this box, pass it by hand: `bonsai-server -t 7`.
 - **`--load-mode none`**, which llama.cpp suggests for experts in RAM, loses the Vulkan device while
   loading (`ErrorDeviceLost`) on this card. It stays on mmap.
 
@@ -229,6 +233,159 @@ and only sets `CPU_MOE` to 40. More expert layers on the card buy 9 % at most. A
 every expert in RAM, 6 GB of VRAM are in use, leaving ~2 GB free. The window stays at 131k.
 `display` already has `CPU_MOE` 40 and needs no override. Any `$PROFILE-$BACKEND.env` works the
 same way, and Bonsai has none because its 64k fits both cards.
+
+## Native Linux
+
+Both models were measured again on the same machine booted into native Linux (Linux Mint 22.3,
+driver 595, CUDA 12.9; T-040, 2026-09-29), with the scripts and corpus of T-034 and T-039
+(`runs/T-040-native-linux/`). Same builds, same profiles, same VRAM to the MiB. **Everything that
+reads experts from RAM is 30-100 % faster.**
+
+| | WSL2 | native |
+| --- | --- | --- |
+| Qwen3.6, natural output, no MTP | 29.0 | **44.6** |
+| Qwen3.6, natural output, MTP (shipped) | 38.7-44.7 | **52.2-64.9** |
+| Qwen3.6, MTP, tg @1k / @43k / @112k | 42.8 / 33.6 / 29.5 | **55.5 / 49.0 / 39.9** |
+| Qwen3.6, MTP, pp @43k / @112k | 700 / 611 | **914 / 773** |
+| Qwen3.6, no MTP (`CPU_MOE` 36, ub 4096), tg @1k / @43k / @112k | 29.7 / 27.7 / 23.5 | **45.4 / 38.3 / 30.3** |
+| Qwen3.6, no MTP, pp @43k / @112k | 1 090 / 947 | **1 330 / 1 117** |
+| Qwen3.8-Flash, 256-token turns | 8.9-10.1 | **18.6-18.9** |
+| Qwen3.8-Flash, pp of a 5 064-token prompt | 36 | **101-103** |
+| Qwen3.8-Flash, load | 28-29 s | 24 s cold, 12-14 s warm |
+
+MTP accepts the same 60-81 % of drafts as under WSL2, so the gain is the path to RAM, not the
+drafting. Bonsai, whose weights are all on the card, runs at 36.6 tok/s natively, the same as under
+WSL2: the cost of WSL2 is in how it reaches host memory, and only the MoE models pay it. That is the
+passthrough the [Windows](dev.md#windows) entry calls unmeasured: ~30-50 % on every token that reads
+experts. Native Linux is the better platform for both Qwen models, and the one Qwen3.8-Flash is
+usable on.
+
+**Qwen3.8-Flash needs every expert cached, and that is a question of the desktop.** 64 GB leaves
+60.5 GiB `MemTotal` with the BIOS giving the iGPU 2 GB. The experts are 55.4 GiB, llama-server's own
+memory 0.7 GiB. With a browser, VS Code and a chat app open (3.8 GiB anonymous memory) the page
+cache held 51.9 GiB of them, and it cost twice:
+
+| MemAvailable before start | desktop | tg | pp, 5k prompt | SSD read, warm 256-token turn | SSD read, warm 5k prompt |
+| --- | --- | --- | --- | --- | --- |
+| 56 371 MiB | browser, editors, chat | 16.3-18.0 | 66-73 | 0.9-1.2 GB | 20-28 GB |
+| 59 290 MiB | terminal only (1.0 GiB anonymous) | **18.6-18.9** | **101-103** | **0** | **0.02-0.17 GB** |
+
+The prompt is the expensive part: with `--no-op-offload` it runs on the CPU and walks every
+expert, and a walk over a set just larger than the cache is the worst case of LRU, every page
+evicted shortly before it is needed again. Hence `MODEL_RAM_FULL_MB=58000` in the model file, and a
+preflight warning below it. Not tried: the BIOS carve-out at 512 MB, which would give 1.5 GiB of
+margin, and `UD-Q3_K_XL` (experts 52.0 GiB), which is no longer needed.
+
+**Threads: llama.cpp's default is the fastest here** (T-037, 2026-10-02, headless). Qwen3.6 as
+shipped, MTP on, three 256-token turns per server at temperature 0, so every run drafted and
+accepted the same tokens; default and `-t 7` twice, interleaved (`runs/T-037-native-threads/`):
+
+| Threads (7800X3D, 8 cores / 16 threads) | tg, mean of three turns |
+| --- | --- |
+| default (8) | **58.5, 58.6** |
+| `-t 7` | 57.2, 57.2 |
+| `-t 6` | 55.3 |
+| `-t 4` | 49.0 |
+
+Every thread fewer costs, and the repeats agree to 0.1 tok/s. For Qwen3.8-Flash `-t 7` and the
+default are within noise (two interleaved pairs, each won once). The ~6 % `-t 7` gained under WSL2
+and the ~10 % on the RX 570's VM are properties of a VM's vCPUs, not of the model, so there is no
+`THREADS` setting: on such a box, pass `-t` to `bonsai-server` by hand.
+
+## Qwen3.8-Flash, 125B (experimental)
+
+`MODEL=qwen38-flash` serves [Qwen3.8-Flash-Next](https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF),
+the architecture mainline calls `qwen4exp`: 125B, 512 experts of which 10 are active, 48 layers
+(36 Gated DeltaNet, 12 sparse attention with a lightning indexer). A side experiment that matured,
+not a candidate for the default: at ~19 tok/s natively it is under half of Qwen3.6's speed, and it
+needs a machine few have. Measured for speed on one machine, and run in one agent session under
+WSL2, where it built the only game of the day whose rematch works ([below](#qwen38-flash-in-an-agent-session)).
+
+**What it needs.** 87.2 GiB of `UD-IQ4_XS` on disk in three parts: routed experts 55.4 GiB, an
+n-gram embedding table 26.8 GiB that is read lazily and does not limit speed, the rest ~4.4 GiB on
+the card. Every expert stays in RAM (`CPU_MOE` 48), read through the page cache. With 50 GB for
+WSL2 (`memory=50GB`, `autoMemoryReclaim=disabled` in `.wslconfig`, a 64 GB PC) the cache holds
+~48 GB of the file and decode runs at ~10 tok/s; at 30 GB the SSD is in the loop and it drops to
+~6. `preflight` asks for 48 GB. On native Linux all 55.4 GiB fit, at ~19 tok/s, once ~58 GB are
+available before start: [Native Linux](#native-linux). And the card must drive no display: the profile fills it to
+7.39 GB, which is within reach only with the monitor on an iGPU (CUDA under WDDM reports 7 063 MiB
+free, but ~7.7 GB of buffers fit; past that Windows spills into shared memory without an error, and
+speed collapses).
+
+**Unsloth's prebuilt llama.cpp, not mainline.** The sparse attention is the reason. Unsloth's
+tree (b11160) runs it with a banded flash-attention kernel over the selected blocks. Mainline
+`8212c78`, and master of 2026-09-29, builds a full mask and runs dense flash attention, which
+takes VRAM at runtime outside the reserved buffers: with the same 7 386 MiB loaded it died twice at
+~2.5k tokens of prefill (`CUDA error: device not ready` in the VMM pool), where the prebuilt ran
+to 31k. So the model file points `LLAMA_DIR` at the llama.cpp Unsloth Studio installs, `build`
+only checks its build number, and `bonsai-server` puts the Studio venv's CUDA 13 runtime on the
+library path, without which the prebuilt runs on the CPU alone and does not say so. T-038 is
+making Unsloth's tree one this repo builds, for every Qwen model.
+
+**The flags**, each measured in the side study (2026-09-28, harness and logs in
+`runs/T-039-qwen38-flash/side-study/`):
+
+| Flag | Why |
+| --- | --- |
+| `--n-cpu-moe 48` | every routed expert in RAM; the 4.4 GiB of the rest is what the card holds |
+| `--no-repack` | keeps the experts file-backed, so the page cache holds them instead of anonymous memory WSL2 swaps out |
+| `--no-op-offload` | prompt processing on the CPU instead of copying 55 GB of experts over PCIe per ubatch: less VRAM, faster on short prompts. With op-offload at ub 2048 a 5k prompt reads at 58 tok/s, but that ubatch does not fit next to 131k |
+| `-cram 0`, `-ctxcp 4` | llama.cpp's defaults (8 GB of prompt cache, 32 checkpoints) sit in the same RAM as the experts |
+| no MTP | the shared-Q8_0 head gives +0-5 % once the experts are cached, costs ~1.1 GB of VRAM, and ran the card out at 64k |
+| `EFFORT` medium | unlike Qwen3.6, this template reads `reasoning_effort` (default `xhigh`); at ~10 tok/s thinking is the expensive part |
+
+**The window.** The indexer's compute buffer is ~13 B x context x ubatch, and that, not the KV
+cache, bounds it. 131k at `q8_0`/`q8_0` and ub 512 is 7 386 MiB. 262k fits with `q4_0`/`q4_0` and ub
+256 (7.56 GB, the same tg, prompts at ~29 tok/s): `CTX=262144 KV_K=q4_0 KV_V=q4_0 UB=256
+bonsai-server`. KV quality at `q4_0` is not measured for this model.
+
+**Measured through `bonsai-server`** (T-039, 2026-09-29, prebuilt b11160, `dedicated`, 50 GB WSL2;
+native Linux in [its own section](#native-linux)):
+
+| Threads | tg, 256-token turns (2 x 3) | pp, 5 064-token prompt | a chat turn with thinking |
+| --- | --- | --- | --- |
+| llama.cpp's default (8 of 16) | 8.9-9.8, mean 9.3 | 36.3, 37.0 | 9.9, 9.6 |
+| `-t 7` | 9.7-10.1, mean 9.85 | 35.6, 36.9 | 10.4 |
+
+Two interleaved pairs, since the page cache warms across runs. `-t 7` won both by ~6 % under WSL2;
+on native Linux the difference is gone, so it is not worth passing there. The chat turns ended with `stop`, their thinking in `reasoning_content`,
+300-570 tokens for a short bash function at `EFFORT` medium. RSS after a run: ~48 GB of the file
+in the page cache, ~0.2 GB anonymous.
+
+The side study measured 8.3 tok/s at 31k of context and 45.6 tok/s reading a 31k prompt, on the
+same flags.
+
+| | `dedicated` | `display` |
+| --- | --- | --- |
+| ctx / KV / `UB` | 131 072 / `q8_0` / 512 | 65 536 / `q8_0` / 512 |
+| VRAM (buffers) | 7 386 MiB, measured | 6 052 MiB, measured without a desktop on the card, which leaves ~1.6 GB for one |
+| `BUDGET` / `MAX_TOKENS` / `RESERVE_TOKENS` / `KEEP_RECENT_TOKENS` | 8192 / 32000 / 32000 / 24000 | 8192 / 16000 / 16000 / 12000 |
+
+The budgets follow [dev.md](dev.md#context-budget) and are not measured in a session. `BUDGET` is
+Bonsai's, not Qwen3.6's 16k: 8k of thinking already takes ~14 minutes here. The cost that will
+decide whether this is usable as an agent is the prompt: pi's first turn and every compaction are
+read at ~36 tok/s under WSL2, so a compaction that keeps 24k takes ~11 minutes; ~4 on native
+Linux at ~100.
+
+### Qwen3.8-Flash in an agent session
+
+Session D of T-035's behaviour day, 2026-09-29, under WSL2 (50 GB, so ~10 tok/s with the SSD in
+the loop), `dedicated` as shipped plus `-t 7`: the study's Tron prompt in a plain `bonsai-pi`
+session, the same protocol as [Qwen3.6's](#in-an-agent-session). The session file stayed in the
+WSL2 distribution; the numbers are from the server log, `runs/T-035-bonsai-measured/day/server-D.log`.
+
+| | |
+| --- | --- |
+| Wall time / requests | 54 min / 32 |
+| Output tokens | 22 261, the largest turn 3 134 |
+| Compactions | none: peak context 28.9k, against the trigger at 99k |
+| Truncated or `length` stops | 0 |
+| tg per request, median | 9.7 (7.4-10.1) |
+| Result, judged by hand | **runs**, and rematch works; small UI bugs |
+
+So the prompt cost that looked like the problem did not come up: 32 requests, a context that never
+passed 29k, and no turn near `BUDGET` 8192. At ~10 tok/s the session took under an hour. n = 1,
+and under WSL2; the same session natively is T-041's session E.
 
 ## When Qwen 4 lands
 

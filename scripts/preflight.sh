@@ -25,12 +25,20 @@ log "preflight ($MODEL on $BACKEND, steps: ${steps[*]})"
 if [[ "$(uname -s)" != Linux ]]; then
   hard "this is $(uname -s), not Linux - under Windows use WSL2"
 else
-  distro="$( . /etc/os-release 2>/dev/null && printf '%s %s' "${NAME:-?}" "${VERSION_ID:-}" )"
+  # A derivative (Linux Mint, Pop!_OS) names its base in ID_LIKE and UBUNTU_CODENAME; what 'deps'
+  # can install depends on that base, not on the name on top.
+  IFS='|' read -r distro id family codename < <( . /etc/os-release 2>/dev/null
+    printf '%s %s|%s|%s %s|%s\n' "${NAME:-?}" "${VERSION_ID:-}" "${ID:-}" "${ID:-}" "${ID_LIKE:-}" "${UBUNTU_CODENAME:-}" )
+  base=""; [[ -n "$codename" && "$id" != ubuntu ]] && base=", Ubuntu $codename base"
   wsl=""; grep -qi microsoft /proc/version 2>/dev/null && wsl=" (WSL2)"
-  case "${distro,,}" in
-    ubuntu*26.04*|debian*13*) pass "system: ${distro:-unknown}$wsl" ;;
-    ubuntu*|debian*)          soft "system: ${distro:-unknown}$wsl - measured on Ubuntu 26.04 (cuda) and Debian 13 (vulkan); deps may install a different toolchain version" ;;
-    *)                        soft "system: ${distro:-unknown}$wsl - not Debian or Ubuntu, so 'deps' cannot install the toolchain; see the Requirements section of README.md" ;;
+  case "${distro,,}|$codename" in
+    ubuntu*26.04*|debian*13*|*"|noble") pass "system: ${distro:-unknown}$base$wsl" ;;
+    *)
+      case " $family " in
+        *" ubuntu "*|*" debian "*) soft "system: ${distro:-unknown}$base$wsl - measured on Ubuntu 26.04 and 24.04 (cuda) and Debian 13 (vulkan); 'deps' checks what apt offers" ;;
+        *) soft "system: ${distro:-unknown}$wsl - not Debian or Ubuntu, so 'deps' cannot install the toolchain; see the Requirements section of README.md" ;;
+      esac
+      ;;
   esac
 fi
 
@@ -44,8 +52,10 @@ esac
 # --- disk -------------------------------------------------------------------
 need_home=0
 runs build && need_home=$((need_home + 2000))
-# A model already in place needs nothing more; model.sh finds it and stops.
-runs model && [[ ! -f "$MODEL_PATH" ]] && need_home=$((need_home + MODEL_DISK_MB))
+# A model already in place needs nothing more; model.sh finds it and stops. Nor does one in the
+# Hugging Face cache, which model.sh links instead of downloading.
+hf_model="${HF_HOME:-$HOME/.cache/huggingface}/hub/models--${MODEL_REPO//\//--}/snapshots/$MODEL_REV/$MODEL_FILE"
+runs model && [[ ! -f "$MODEL_PATH" && ! -f "$hf_model" ]] && need_home=$((need_home + MODEL_DISK_MB))
 runs pi    && need_home=$((need_home + 500))
 if ((need_home > 0)); then
   have="$(free_mb "$BONSAI_HOME")"
@@ -82,6 +92,10 @@ elif ((MODEL_RAM_MB > 0)); then
   elif ((avail_mb < MODEL_RAM_MB - 4000)); then
     # Most of what it holds is the mmapped experts as page cache, which counts as available.
     soft "RAM: ${avail_mb} of ${total_mb} MB available, $MODEL holds ~${MODEL_RAM_MB} MB while serving - close something before starting it"
+  elif ((avail_mb < MODEL_RAM_FULL_MB)); then
+    # Runs, but not every expert stays cached: the SSD is in the loop, and a prompt read on the CPU
+    # evicts what the next token needs. Measured in docs/qwen.md#native-linux.
+    soft "RAM: ${avail_mb} of ${total_mb} MB available - $MODEL keeps every expert cached from ~${MODEL_RAM_FULL_MB} MB; below that it reads from the SSD (~17 instead of ~19 tok/s, prompts at ~70 instead of ~100). Close the browser and editors, or run it on native Linux${wslhint:+ rather than WSL2}"
   else
     pass "RAM: ${avail_mb} of ${total_mb} MB available, $MODEL holds ~${MODEL_RAM_MB} MB"
   fi
@@ -105,13 +119,32 @@ case "$BACKEND" in
     if ! has nvidia-smi; then
       hard "driver: nvidia-smi not found - install the NVIDIA driver (under WSL2 on the Windows side)"
     elif ! out="$(nvidia-smi --query-gpu=name,memory.total,memory.used --format=csv,noheader,nounits 2>&1)"; then
-      hard "driver: nvidia-smi fails - ${out%%$'\n'*}"
+      # On native Linux the usual cause: Secure Boot refuses a DKMS module whose signing key was
+      # never enrolled, and nvidia-smi only says it cannot reach the driver.
+      if ! grep -q '^nvidia ' /proc/modules 2>/dev/null && has mokutil \
+         && mokutil --sb-state 2>/dev/null | grep -qi 'enabled'; then
+        hard "driver: the nvidia kernel module is not loaded and Secure Boot is on - its signing key is probably not enrolled, see docs/dev.md#secure-boot"
+      else
+        hard "driver: nvidia-smi fails - ${out%%$'\n'*}"
+      fi
     else
       IFS=',' read -r gname vram_total vram_used <<<"${out%%$'\n'*}"
       vram_total="${vram_total// /}" vram_used="${vram_used// /}"
       pass "GPU:${gname} (${vram_total} MiB)"
     fi
-    if runs build && ! has nvcc && ! runs deps; then
+    # A prebuilt llama.cpp (LLAMA_PREBUILT) is not compiled here and needs no nvcc.
+    nv="$(nvcc_version)"
+    if [[ -n "$LLAMA_PREBUILT" ]] && ! runs deps; then
+      :
+    elif [[ -n "$nv" ]] && ! version_ge "$nv" 12.4; then
+      runs build && hard "toolchain: nvcc $nv is older than 12.4 - see docs/dev.md#cuda-from-nvidias-repository"
+    elif [[ -z "$nv" ]] && runs deps && has apt-get; then
+      # deps would install apt's toolkit; say now, not after the other packages, if it is too old.
+      cand="$(apt_cuda_version)"
+      if [[ -z "$cand" ]] || ! version_ge "$cand" 12.4; then
+        hard "toolchain: apt offers CUDA ${cand:-nothing} here, the build needs >= 12.4 - install cuda-toolkit-12-9 from NVIDIA's repository first, see docs/dev.md#cuda-from-nvidias-repository"
+      fi
+    elif [[ -z "$nv" ]] && runs build && ! runs deps; then
       hard "toolchain: nvcc not found and 'deps' is not in this run - install CUDA >= 12.4 or run ./install.sh deps"
     fi
     ;;
@@ -140,6 +173,13 @@ case "$BACKEND" in
     ;;
 esac
 
+# deps installs these; a run without it has to find them, or build dies after the fetch.
+if runs build && ! runs deps && [[ -z "$LLAMA_PREBUILT" ]]; then
+  for t in cmake git; do
+    has "$t" || hard "toolchain: $t not found and 'deps' is not in this run - install it or run ./install.sh deps"
+  done
+fi
+
 if ((vram_total > 0)); then
   if ((vram_total < 7600)); then
     hard "VRAM: ${vram_total} MiB - this setup needs 8 GB and does not run partially offloaded at usable speed"
@@ -158,12 +198,18 @@ fi
 
 # --- Node -------------------------------------------------------------------
 if runs pi; then
+  # Ubuntu 24.04 ships 18, Debian 13 20: nvm is the usual source, and it only reaches the PATH of a
+  # shell that read ~/.bashrc.
+  nvm_node="$(ls -d "${NVM_DIR:-$HOME/.nvm}"/versions/node/v* 2>/dev/null | sort -V | tail -1)"
+  nvm_hint=" - install one with nvm or NodeSource, see docs/dev.md#toolchain"
+  [[ -n "$nvm_node" ]] && version_ge "${nvm_node##*/v}" 22.19 \
+    && nvm_hint=" - nvm has ${nvm_node##*/}, but not on this shell's PATH: run from a shell that loads nvm (source ~/.nvm/nvm.sh)"
   if ! has node; then
-    hard "node: not found - pi needs Node.js >= 22.19"
+    hard "node: not found - pi needs Node.js >= 22.19$nvm_hint"
   else
     nver="$(node --version 2>/dev/null | tr -d v)"
-    if [[ -n "$nver" ]] && [[ "$(printf '%s\n' 22.19 "$nver" | sort -V | head -1)" != 22.19 ]]; then
-      hard "node: v$nver is older than the required 22.19"
+    if [[ -n "$nver" ]] && ! version_ge "$nver" 22.19; then
+      hard "node: v$nver is older than the required 22.19$nvm_hint"
     else
       pass "node: v${nver:-?}"
     fi
