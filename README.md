@@ -107,7 +107,7 @@ with 441 MiB of headroom on one driver.
 
 | | |
 | --- | --- |
-| NVIDIA | RTX 20xx to 40xx with 8 GB or more. RTX 50xx needs CUDA >= 12.8, untested ([T-007](backlog/T-007-blackwell.md)) |
+| NVIDIA | RTX 20xx to 40xx with 8 GB or more. RTX 50xx needs CUDA >= 12.8, untested ([T-020](backlog/T-020-supported-hardware.md)) |
 | AMD | RDNA2 and RDNA3 through Vulkan, which should be considerably faster than the RX 570 |
 | More than 8 GB | works, but wastes the window; raise `CTX` yourself, see [Context budget](docs/dev.md#context-budget) |
 

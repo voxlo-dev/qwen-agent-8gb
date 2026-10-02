@@ -487,6 +487,11 @@ beat many small ones here: half the steps of the 4096 run, in the same time, for
 that holds up. The 64k run's closest approach to pi's clamp left 5 372 tokens of margin, so
 the trigger was never the limit.
 
+**The 4096 stays.** pi's `CONTEXT_SAFETY_TOKENS` is a constant in its bundle. Shrinking it means
+patching a pinned dependency, which `PI_VERSION` would then no longer describe, or asking pi for a
+setting. With 5 372 tokens of margin in the run above, ~3k more working room per compaction cycle
+is not worth either. Revisit only if a profile runs tighter than that (closed as T-015).
+
 The 4096 re-run (session `2026-09-19T19-16-01`): 168 steps in
 112 minutes, and the run ended on its own (`stopReason: stop`) with no step cut off on
 `length`. 7 compactions, 8-33 steps apart, back at 14.5-19.4k each time. 6 steps hit the
@@ -516,7 +521,7 @@ Logs and `evaluate.sh`: `runs/T-035-bonsai-measured/day/` on the 4060 Ti machine
 the game was written in 20 minutes, then the model built its own test harness, a headless DOM in
 Node's `vm`, and spent from minute 58 to ~108 on one nested-quote escape in it (with `xxd`, `cmp`
 and scratch files), and the next 50 minutes on the harness again. It never went back to the game.
-Nothing in the log points at the window, so **64k stays `dedicated` for now**, and T-035 runs a
+Nothing in the log points at the window, so **64k stays `dedicated` for now**, and T-041 runs a
 second pair before that is final. The harness rabbit hole is also what the
 [agent prompt](#the-agent-prompt) now speaks to.
 
@@ -573,7 +578,7 @@ situation with the reason for each point, not as rules, and that is a measured c
 The first version (until 2026-09-27) was four imperatives: think short, one step per turn, no
 restating, minimal tool arguments. None of it was ever measured against no file at all. The
 current one is unmeasured too; its reading is the next Tron pair in
-[T-035](../backlog/T-035-bonsai-measured.md).
+[T-041](../backlog/T-041-tron-day-2.md).
 
 ## pi
 

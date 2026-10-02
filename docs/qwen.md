@@ -4,7 +4,7 @@
 35B parameters, 3B of them active per token. The experts live in system RAM; the card holds
 attention, the shared expert, the KV cache and the MTP head. **Experimental**: measured for speed
 and KV quality, and in one agent session, where it built the study's game in 7 minutes with one
-feature broken ([below](#in-an-agent-session)). Whether that ships it as supported is open (T-034).
+feature broken ([below](#in-an-agent-session)). Whether that ships it as supported is open (T-041).
 Bonsai stays the default.
 
 It is also the slot for Qwen 4. If a Qwen 4 35B-A3B ships, it becomes a model file of its own plus
@@ -223,9 +223,8 @@ follows.** The knobs tried around it:
 - **One CPU thread fewer is worth ~10 %.** With every expert in RAM, 8 threads on the VM's 8 vCPUs
   compete with the thread that drives the GPU. A 256-token turn without MTP: `-t 8` 17.2 and
   17.1, `-t 7` 18.9 and 19.0, `-t 6` 19.0 and 17.9, `-t 5` 19.4, `-t 4` 18.8. Not a default: it is
-  one VM's core count, and the 4060 Ti machine, where Qwen is bounded by RAM, may well behave
-  similarly. That is [T-037](../backlog/T-037-moe-cpu-threads.md). Until then, pass `-t` to
-  `bonsai-server` by hand.
+  this VM's, and on the 4060 Ti machine under native Linux it reverses
+  ([Native Linux](#native-linux)). On this box, pass it by hand: `bonsai-server -t 7`.
 - **`--load-mode none`**, which llama.cpp suggests for experts in RAM, loses the Vulkan device while
   loading (`ErrorDeviceLost`) on this card. It stays on mmap.
 
@@ -277,8 +276,21 @@ evicted shortly before it is needed again. Hence `MODEL_RAM_FULL_MB=58000` in th
 preflight warning below it. Not tried: the BIOS carve-out at 512 MB, which would give 1.5 GiB of
 margin, and `UD-Q3_K_XL` (experts 52.0 GiB), which is no longer needed.
 
-Threads, for T-037: on native Linux `-t 7` and the default 8 are within noise for Qwen3.8-Flash
-(two interleaved pairs, each won once), unlike WSL2's ~6 %.
+**Threads: llama.cpp's default is the fastest here** (T-037, 2026-10-02, headless). Qwen3.6 as
+shipped, MTP on, three 256-token turns per server at temperature 0, so every run drafted and
+accepted the same tokens; default and `-t 7` twice, interleaved (`runs/T-037-native-threads/`):
+
+| Threads (7800X3D, 8 cores / 16 threads) | tg, mean of three turns |
+| --- | --- |
+| default (8) | **58.5, 58.6** |
+| `-t 7` | 57.2, 57.2 |
+| `-t 6` | 55.3 |
+| `-t 4` | 49.0 |
+
+Every thread fewer costs, and the repeats agree to 0.1 tok/s. For Qwen3.8-Flash `-t 7` and the
+default are within noise (two interleaved pairs, each won once). The ~6 % `-t 7` gained under WSL2
+and the ~10 % on the RX 570's VM are properties of a VM's vCPUs, not of the model, so there is no
+`THREADS` setting: on such a box, pass `-t` to `bonsai-server` by hand.
 
 ## Qwen3.8-Flash, 125B (experimental)
 
@@ -286,7 +298,8 @@ Threads, for T-037: on native Linux `-t 7` and the default 8 are within noise fo
 the architecture mainline calls `qwen4exp`: 125B, 512 experts of which 10 are active, 48 layers
 (36 Gated DeltaNet, 12 sparse attention with a lightning indexer). A side experiment that matured,
 not a candidate for the default: at ~19 tok/s natively it is under half of Qwen3.6's speed, and it
-needs a machine few have. Measured for speed on one machine, never in an agent session (T-039).
+needs a machine few have. Measured for speed on one machine, and run in one agent session under
+WSL2, where it built the only game of the day whose rematch works ([below](#qwen38-flash-in-an-agent-session)).
 
 **What it needs.** 87.2 GiB of `UD-IQ4_XS` on disk in three parts: routed experts 55.4 GiB, an
 n-gram embedding table 26.8 GiB that is read lazily and does not limit speed, the rest ~4.4 GiB on
@@ -353,6 +366,26 @@ Bonsai's, not Qwen3.6's 16k: 8k of thinking already takes ~14 minutes here. The 
 decide whether this is usable as an agent is the prompt: pi's first turn and every compaction are
 read at ~36 tok/s under WSL2, so a compaction that keeps 24k takes ~11 minutes; ~4 on native
 Linux at ~100.
+
+### Qwen3.8-Flash in an agent session
+
+Session D of T-035's behaviour day, 2026-09-29, under WSL2 (50 GB, so ~10 tok/s with the SSD in
+the loop), `dedicated` as shipped plus `-t 7`: the study's Tron prompt in a plain `bonsai-pi`
+session, the same protocol as [Qwen3.6's](#in-an-agent-session). The session file stayed in the
+WSL2 distribution; the numbers are from the server log, `runs/T-035-bonsai-measured/day/server-D.log`.
+
+| | |
+| --- | --- |
+| Wall time / requests | 54 min / 32 |
+| Output tokens | 22 261, the largest turn 3 134 |
+| Compactions | none: peak context 28.9k, against the trigger at 99k |
+| Truncated or `length` stops | 0 |
+| tg per request, median | 9.7 (7.4-10.1) |
+| Result, judged by hand | **runs**, and rematch works; small UI bugs |
+
+So the prompt cost that looked like the problem did not come up: 32 requests, a context that never
+passed 29k, and no turn near `BUDGET` 8192. At ~10 tok/s the session took under an hour. n = 1,
+and under WSL2; the same session natively is T-041's session E.
 
 ## When Qwen 4 lands
 

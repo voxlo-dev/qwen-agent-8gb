@@ -4,7 +4,7 @@
 - **Category:** feature
 - **Importance:** medium
 - **Effort:** M
-- **Depends on:** none. Found in T-039
+- **Depends on:** none. Found in T-039 (closed; the model is in [qwen.md](../docs/qwen.md#qwen38-flash-125b-experimental))
 
 ## Why
 
@@ -32,9 +32,9 @@ a build number that `build` warns on.
    `git fetch`: URL plus SHA256 as the pin, same stamp logic. Or a fetchable commit if Unsloth
    pushes one.
 2. **Build it** into `$BONSAI_HOME/llama.cpp-unsloth`, CUDA, and check Qwen3.8-Flash against the
-   prebuilt: same buffers, same tg/pp (T-039's numbers).
-3. **Qwen3.6 on it**: MTP drafting (`--spec-type draft-mtp`) must still work, then T-034's
-   shipped row re-run (131k, `CPU_MOE` 38, `UB` 2048): tg @1k/@43k, pp, VRAM. Within the noise,
+   prebuilt: same buffers, same tg/pp ([Native Linux](../docs/qwen.md#native-linux): 18.6-18.9, pp ~100).
+3. **Qwen3.6 on it**: MTP drafting (`--spec-type draft-mtp`) must still work, then the
+   shipped row of [qwen.md](../docs/qwen.md#native-linux) re-run natively (131k, `CPU_MOE` 38, `UB` 2048): tg @1k/@43k, pp, VRAM. Within the noise,
    `models/qwen36-35b.env` moves; worse, it stays on mainline and this ticket says why.
 4. **Vulkan**: Qwen3.6 is measured on the RX 570. Whether Unsloth's tree builds for Vulkan and runs
    there is part of the decision; if not, Qwen3.6 keeps mainline on `vulkan`.
