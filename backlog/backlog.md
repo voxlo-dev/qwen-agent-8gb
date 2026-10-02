@@ -29,8 +29,8 @@ disclaimer, acknowledgements, the experimental label on the localagent workflow,
 UX with `scripts/preflight.sh`.
 
 Public since 2026-09-21 at <https://github.com/voxlo-dev/bonsai-agent-8gb>, tagged `v0.1.0`.
-Remaining order: T-024 (two minutes in a browser), T-035 after T-041. T-020 follows the reports.
+Remaining order: T-035 after T-041. T-020 follows the reports. T-024 (repo setup) closed on 2026-10-02:
+both issue templates render.
 
 - [`T-035`](T-035-bonsai-measured.md) The quality claim — Bonsai through OpenCode with the study's prompt, twice, on the profile T-041 settles; then `docs/evidence.md` and the README's "what is measured"; was T-027 and T-033 · spike · high · S
-- [`T-024`](T-024-public-repo-setup.md) Public repo setup — done except confirming the two issue templates render · chore · low · S
 - [`T-020`](T-020-supported-hardware.md) Finish the hardware table — 12/16 GB profiles, Blackwell, RDNA2/3, from the rows hardware reports bring in; the three tiers are already in the README; merges T-007 and T-008's bigger-cards half · decision · medium · M

@@ -40,4 +40,8 @@ GPU, VRAM, driver and free VRAM before building, and warns when a display is on 
    reporter has a 9070 XT and a 860M. Ask for numbers through the hardware-report issue template
    (T-024) rather than buying cards.
 
+The logs behind the measured numbers live in `runs/`, which is gitignored, so they are not public.
+If a hardware report or a reviewer asks for one, decide then whether to publish a subset (from
+T-024).
+
 Out of scope: ROCm/HIP, Intel oneAPI, Apple. Vulkan is the one AMD path, stated as such.
