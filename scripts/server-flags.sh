@@ -6,9 +6,6 @@
 # where it listens, the slot count and the drafting stay with each launcher, because Studio takes
 # those as options of its own. Rationale: docs/dev.md.
 
-# A prebuilt llama.cpp may need its runtime on the library path; see config.env.
-if [[ -n "$LLAMA_LIB_PATH" ]]; then export LD_LIBRARY_PATH="$LLAMA_LIB_PATH${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"; fi
-
 if [[ "$BACKEND" == vulkan ]]; then
   # RADV puts buffers in GTT although VRAM is free; this keeps the compute buffer in VRAM,
   # worth 1.22x on this model. Needs Mesa >= 25.2, silently ignored below.

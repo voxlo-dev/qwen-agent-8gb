@@ -132,11 +132,8 @@ case "$BACKEND" in
       vram_total="${vram_total// /}" vram_used="${vram_used// /}"
       pass "GPU:${gname} (${vram_total} MiB)"
     fi
-    # A prebuilt llama.cpp (LLAMA_PREBUILT) is not compiled here and needs no nvcc.
     nv="$(nvcc_version)"
-    if [[ -n "$LLAMA_PREBUILT" ]] && ! runs deps; then
-      :
-    elif [[ -n "$nv" ]] && ! version_ge "$nv" 12.4; then
+    if [[ -n "$nv" ]] && ! version_ge "$nv" 12.4; then
       runs build && hard "toolchain: nvcc $nv is older than 12.4 - see docs/dev.md#cuda-from-nvidias-repository"
     elif [[ -z "$nv" ]] && runs deps && has apt-get; then
       # deps would install apt's toolkit; say now, not after the other packages, if it is too old.
@@ -174,7 +171,7 @@ case "$BACKEND" in
 esac
 
 # deps installs these; a run without it has to find them, or build dies after the fetch.
-if runs build && ! runs deps && [[ -z "$LLAMA_PREBUILT" ]]; then
+if runs build && ! runs deps; then
   for t in cmake git; do
     has "$t" || hard "toolchain: $t not found and 'deps' is not in this run - install it or run ./install.sh deps"
   done

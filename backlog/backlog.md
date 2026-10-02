@@ -7,18 +7,18 @@ Numbers have gaps: a closed ticket's file is deleted, and a ticket that is nobod
 is named `T-NNN-{slug}.local.md`, which `.gitignore` keeps out of the repo. The counter below never
 reuses a number either way.
 
-**Next ticket: `T-043`**
+**Next ticket: `T-044`**
 
 ## Draft
 
 ## Backlog
 
-In this order. T-038 first, so the Qwen sessions of T-041 run on the tree that stays; T-041
-decides what T-042 and T-035 measure; T-032 stands alone; T-017 waits for upstream.
+In this order. T-041 decides what T-042 and T-035 measure; T-043 and T-032 stand alone; T-017
+waits for upstream. T-038 closed on 2026-10-02: both Qwen models on Unsloth's tree, built from source.
 
-- [`T-038`](T-038-unsloth-llama-for-qwen.md) Unsloth's llama.cpp as the tree every Qwen model runs on — built from its pinned source tarball (b11160), `bonsai-studio` opens any model in Unsloth Studio on this repo's build; left, on the card: built tree against the prebuilt, Qwen3.6 on it, then the prebuilt support goes · feature · medium · M
 - [`T-041`](T-041-tron-day-2.md) The second Tron day, natively — A2/C2 (Bonsai 96k against 64k on the new agent prompt), S (Sharp template), B2 (Qwen3.6), E (Qwen3.8-Flash); decides 96k, the prompt, Sharp, and Qwen3.6 supported or not; merges T-031, T-034, T-035 3b, T-039, T-040 · spike · high · M
 - [`T-042`](T-042-display-profiles.md) The `display` profiles, checked once with a desktop on the card — all three are arithmetic or measured without one; Bonsai's 64k `q4_0` candidate after T-041; needs a monitor on the headless machine; merges T-008's display half · decision · medium · S
+- [`T-043`](T-043-bonsai-studio-on-the-card.md) `bonsai-studio` on the card — VRAM and tg against `bonsai-server` for Qwen3.6 and Bonsai; verified on the CPU only, since the agent sandbox has no GPU; from your own shell · chore · low · S
 - [`T-032`](T-032-docker-server-image.md) A Dockerfile for the server, not for pi — `llama-server` in a container, pi stays on the host through `SERVER_HOST`; answers the apt-toolchain problem off the host and nothing about drivers, VRAM or the profile · feature · medium · M
 - [`T-017`](T-017-upstream-ptq1_0-vulkan-patch.md) Upstream: a pin that makes the Vulkan patch, then the fork, unnecessary — comment on the fork's #185 posted, #252 matches the patch on generation; watch #252 and mainline #29077, then move the pin, re-measure both cards, drop what is no longer needed; merges T-029 · decision · medium · S
 

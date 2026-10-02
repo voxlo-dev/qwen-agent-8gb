@@ -233,7 +233,7 @@ a mixture-of-experts model whose experts live in system RAM while the card holds
 same 4060 Ti it runs a 131k window at 39-45 tok/s on natural output under WSL2, with multi-token
 prediction, and at 52-65 tok/s on native Linux.
 It needs **~28 GB of RAM** (under WSL2, raise `memory=` in `%UserProfile%\.wslconfig`), 22 GB of
-disk, and a mainline llama.cpp build next to the fork. On the RX 570 it runs too, at
+disk, and a second llama.cpp build next to the fork: Unsloth's, from its pinned source, mainline on Vulkan. On the RX 570 it runs too, at
 2.5-3.5x Bonsai's speed there, ~22 tok/s at 131k. In its one agent session so far it built the
 study's Tron game in 7 minutes, with rematch broken: [docs/qwen.md](docs/qwen.md#in-an-agent-session).
 

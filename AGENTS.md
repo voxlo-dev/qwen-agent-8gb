@@ -50,7 +50,7 @@ than the window holds. Never change one alone; the constraints are in
 [`docs/dev.md`](docs/dev.md#context-budget).
 
 **Pins are deliberate.** `LLAMA_COMMIT`, `MODEL_REV` and `MODEL_SHA256` exist per model: Bonsai
-needs a fork mainline llama.cpp has not absorbed, Qwen a mainline commit whose MTP drafting was measured. `PI_VERSION` pins the compaction code the budget
+needs a fork mainline llama.cpp has not absorbed, Qwen Unsloth's tree (a source tarball, checksummed) whose MTP drafting and sparse attention were measured, mainline on Vulkan. `PI_VERSION` pins the compaction code the budget
 was measured against. Moving any of them means re-testing load and speed, checking that `patches/`
 still applies (`build` refuses when it does not), and for `PI_VERSION` re-checking the budget.
 
@@ -63,7 +63,7 @@ existing pi keeps its providers, defaults and compaction settings.
 ```bash
 ./install.sh                       # everything; FORCE=1 ./install.sh build rebuilds
 BACKEND=vulkan ./install.sh build  # the AMD path, patches and all
-MODEL=qwen36-35b ./install.sh      # the second model: mainline tree, its GGUF, its pi dir
+MODEL=qwen36-35b ./install.sh      # the second model: Unsloth's tree, its GGUF, its pi dir
 bonsai-pi                          # starts the server itself
 ```
 
@@ -110,7 +110,7 @@ Every fact has one home, chosen by how long it stays true.
 | `docs/dev.md` | durable | why each non-default choice is what it is, with its measurement, plus troubleshooting. Also this project's decisions log |
 | `docs/performance.md` | durable | what limits generation speed: the bandwidth roofline, and the optimizations tried and rejected |
 | `docs/context-window.md` | durable | the window and the KV cache for both models: what fits on 8 GB, the silent WSL2 spill, KV quality against f16 |
-| `docs/qwen.md` | durable | the MoE models: why a MoE, the offload/MTP/fork-or-mainline measurement, their profiles, Qwen3.8-Flash with every expert in RAM, the Qwen 4 slot |
+| `docs/qwen.md` | durable | the MoE models: why a MoE, the offload/MTP/fork-or-mainline measurement, the Unsloth tree, their profiles, Qwen3.8-Flash with every expert in RAM, the Qwen 4 slot |
 | `docs/localagent.md` | durable | the frozen workflow: why it is not recommended, its shape, how it runs on pi, the measured runs |
 | `docs/model-comparison.md` | durable | eight local models as coding agents on 8 GB, from the study predating this repo. **Frozen**: a record of finished work. New measurements go to `docs/dev.md` or a ticket |
 | `backlog/` | living | one file per ticket, `T-NNN-{slug}.md`, indexed in `backlog.md` with the `Next ticket` counter. A private one gets `.local.md` and stays out of the repo, so the numbers have gaps |

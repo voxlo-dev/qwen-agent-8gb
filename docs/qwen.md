@@ -27,7 +27,8 @@ tokens at `q8_0`/`q8_0`, against Bonsai's 34.
 | --- | --- |
 | Model | `unsloth/Qwen3.6-35B-A3B-MTP-GGUF` rev `5bc3e238d916f48a861bac2f8a1990a0e9b7e98d`, `Qwen3.6-35B-A3B-UD-Q4_K_M.gguf`, 22 663 387 424 bytes |
 | sha256 | `0b21525e972670ed59e1812e170b27c26355381f0656ecc4e25617ece7dac58b` |
-| llama.cpp | mainline, ggml-org `8212c7802455255460ab8e18fc34754560031b34` (2026-09-24), in its own `$BONSAI_HOME/llama.cpp-mainline` |
+| llama.cpp, CUDA | Unsloth's b11160, source `a3c12db9dfc9a5bdf93df199ec370e9faf117c69` from its release tarball, in `$BONSAI_HOME/llama.cpp-unsloth`, shared with Qwen3.8-Flash ([why](#one-tree-for-both-qwen-models)) |
+| llama.cpp, Vulkan | mainline, ggml-org `8212c7802455255460ab8e18fc34754560031b34` (2026-09-24), in `$BONSAI_HOME/llama.cpp-mainline`; everything below was measured on it |
 
 The `-MTP-` repo carries the same weights as `unsloth/Qwen3.6-35B-A3B-GGUF` plus one MTP layer
 (`blk.40.nextn.*`), which the fork ignores and mainline drafts with. Not
@@ -324,6 +325,12 @@ T-038 `build` compiles the same source itself into `llama.cpp-unsloth`: the sour
 prebuilt was built from, with its sha256, and the result reports the same build 11160. Statically
 linked against the system's CUDA 12.9 like the other two trees, it needs nothing from Studio.
 
+Measured against the prebuilt on 2026-10-02 (native Linux, headless, the same 131k buffers,
+interleaved built, prebuilt, built; `runs/T-038-unsloth-tree/`): VRAM 7 566 against 7 568 MiB,
+three 256-token turns at 18.1-18.9 tok/s against 17.8-18.5, the 5k prompt warm at 105-106 against
+103. At temperature 0 both wrote the same text token for token. The prebuilt support
+(`LLAMA_PREBUILT`, the Studio venv's CUDA runtime on the library path) is gone with it.
+
 **The flags**, each measured in the side study (2026-09-28, harness and logs in
 `runs/T-039-qwen38-flash/side-study/`):
 
@@ -388,6 +395,24 @@ WSL2 distribution; the numbers are from the server log, `runs/T-035-bonsai-measu
 So the prompt cost that looked like the problem did not come up: 32 requests, a context that never
 passed 29k, and no turn near `BUDGET` 8192. At ~10 tok/s the session took under an hour. n = 1,
 and under WSL2; the same session natively is T-041's session E.
+
+## One tree for both Qwen models
+
+Since T-038 Qwen3.6 runs on Unsloth's tree too, on CUDA: one build for both MoE models, the one
+Unsloth Studio ships, so `bonsai-studio` and `bonsai-server` run the same code. Measured against
+mainline `8212c78` on 2026-10-02, native Linux, the shipped profile (131k, `CPU_MOE` 38, `UB` 2048,
+MTP), three 256-token turns at temperature 0 and one 41.7k-token prompt with 123 tokens after it:
+
+| | mainline `8212c78` | Unsloth b11160 |
+| --- | --- | --- |
+| VRAM | 7 278 MiB | 7 278 MiB |
+| tg, three turns | 57.1 / 64.1 / 54.3 | 56.7 / 63.9 / 54.2 |
+| MTP drafts accepted | 162 / 176 / 160 | 162 / 176 / 160 |
+| pp, 41.7k prompt / tg after it | 906 / 45.2 | 905 / 45.1 |
+
+The same drafts accepted down to the token, and speed within 0.6 %. On Vulkan Qwen3.6 stays on
+mainline, where the RX 570 numbers above come from; whether Unsloth's tree builds and runs there
+is unmeasured. Logs: `runs/T-038-unsloth-tree/`.
 
 ## When Qwen 4 lands
 

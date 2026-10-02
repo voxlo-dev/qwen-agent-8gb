@@ -118,8 +118,7 @@ sudo reboot    # MOK Manager: Enroll MOK, Continue, Yes, the password (US layout
 ```
 
 An installer that probes the GPU, Unsloth Studio's among them, has to run after this: before it,
-Unsloth saw only the iGPU and installed CPU torch and the Vulkan llama.cpp build, which
-`build` now refuses for a CUDA model.
+Unsloth saw only the iGPU and installed CPU torch and the Vulkan llama.cpp build.
 
 ## Windows
 
@@ -672,7 +671,7 @@ instead of a bare llama-server: Studio's chat UI and API, this repo's build and 
 
 - **The build.** `LLAMA_SERVER_PATH` points Studio at `LLAMA_SERVER`, the tree the model file
   pins. That is the first place Studio looks, ahead of its own `~/.unsloth/llama.cpp`, so Bonsai
-  runs on the fork and Qwen3.8-Flash on the Unsloth tree this repo built, at the pinned source.
+  runs on the fork and both Qwen models on the Unsloth tree this repo built, at the pinned source.
 - **The flags.** `scripts/server-flags.sh` holds what `bonsai-server` passes, and `bonsai-studio`
   hands the same list to Studio, which appends it after its own flags: llama.cpp's last value
   wins, so the profile's placement, cache types, reasoning budget and `SERVER_ARGS` are what runs.
@@ -704,7 +703,8 @@ which the agent sandbox does not have: for all three models Studio started our b
 flag of the profile last on its command line and loaded at the profile's window. Qwen3.6 and
 Qwen3.8-Flash answered a chat request through its API on the CPU (21 tok/s with MTP accepting
 55 %, and 6.2); Bonsai's ternary weights read a prompt on the CPU too slowly to wait for. Not yet
-run with the card, so VRAM and speed under Studio are unmeasured (T-038).
+run with the card, so VRAM and speed under Studio are unmeasured (T-043): the agent sandbox runs
+Studio, and with it its llama-server, without the GPU.
 
 ## localagent workflow
 
@@ -794,7 +794,6 @@ be gone by the time this one starts. See [VRAM budget](#vram-budget).
 | `apt offers CUDA 12.0 here` from `deps` or preflight | Ubuntu 24.04 or a derivative. Install [CUDA from NVIDIA's repository](#cuda-from-nvidias-repository), then `./install.sh`. |
 | `cmake: command not found` in `build` | `deps` was skipped. Run it, or install `cmake` yourself; preflight now says so first. |
 | `node: v18... - nvm has v24...` | nvm is loaded by `~/.bashrc` only. Run from an interactive shell, or `source ~/.nvm/nvm.sh`. |
-| `prebuilt ... has no CUDA backend` from `build` (Qwen3.8-Flash on Studio's prebuilt, `LLAMA_PREBUILT=unsloth`) | Unsloth was installed before the NVIDIA driver worked and chose Vulkan or CPU. Repair it in Studio. |
 | `preflight: N problem(s)` | Each line above it says what and how. `SKIP_PREFLIGHT=1 ./install.sh` goes ahead anyway. |
 | `preflight` warns that VRAM is already in use | A desktop or another server is on the card. `PROFILE=display`, or free it. See [VRAM budget](#vram-budget). |
 | `download failed` from `model` | Run `./install.sh model` again; `curl -C -` resumes from the `.part` file. |
