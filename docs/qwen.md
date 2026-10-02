@@ -312,15 +312,17 @@ available before start: [Native Linux](#native-linux). And the card must drive n
 free, but ~7.7 GB of buffers fit; past that Windows spills into shared memory without an error, and
 speed collapses).
 
-**Unsloth's prebuilt llama.cpp, not mainline.** The sparse attention is the reason. Unsloth's
-tree (b11160) runs it with a banded flash-attention kernel over the selected blocks. Mainline
+**Unsloth's llama.cpp, not mainline.** The sparse attention is the reason. Unsloth's tree
+(b11160) runs it with a banded flash-attention kernel over the selected blocks. Mainline
 `8212c78`, and master of 2026-09-29, builds a full mask and runs dense flash attention, which
 takes VRAM at runtime outside the reserved buffers: with the same 7 386 MiB loaded it died twice at
-~2.5k tokens of prefill (`CUDA error: device not ready` in the VMM pool), where the prebuilt ran
-to 31k. So the model file points `LLAMA_DIR` at the llama.cpp Unsloth Studio installs, `build`
-only checks its build number, and `bonsai-server` puts the Studio venv's CUDA 13 runtime on the
-library path, without which the prebuilt runs on the CPU alone and does not say so. T-038 is
-making Unsloth's tree one this repo builds, for every Qwen model.
+~2.5k tokens of prefill (`CUDA error: device not ready` in the VMM pool), where Unsloth's tree ran
+to 31k. The measurements below ran on the prebuilt Unsloth Studio installs, which needs the Studio
+venv's CUDA 13 runtime on the library path and runs on the CPU alone, silently, without it. Since
+T-038 `build` compiles the same source itself into `llama.cpp-unsloth`: the source commit
+`a3c12db` cannot be fetched from Unsloth's repository, so the pin is the release tarball the
+prebuilt was built from, with its sha256, and the result reports the same build 11160. Statically
+linked against the system's CUDA 12.9 like the other two trees, it needs nothing from Studio.
 
 **The flags**, each measured in the side study (2026-09-28, harness and logs in
 `runs/T-039-qwen38-flash/side-study/`):
@@ -330,7 +332,7 @@ making Unsloth's tree one this repo builds, for every Qwen model.
 | `--n-cpu-moe 48` | every routed expert in RAM; the 4.4 GiB of the rest is what the card holds |
 | `--no-repack` | keeps the experts file-backed, so the page cache holds them instead of anonymous memory WSL2 swaps out |
 | `--no-op-offload` | prompt processing on the CPU instead of copying 55 GB of experts over PCIe per ubatch: less VRAM, faster on short prompts. With op-offload at ub 2048 a 5k prompt reads at 58 tok/s, but that ubatch does not fit next to 131k |
-| `-cram 0`, `-ctxcp 4` | llama.cpp's defaults (8 GB of prompt cache, 32 checkpoints) sit in the same RAM as the experts |
+| `--cache-ram 0`, `--ctx-checkpoints 4` | llama.cpp's defaults (8 GB of prompt cache, 32 checkpoints) sit in the same RAM as the experts |
 | no MTP | the shared-Q8_0 head gives +0-5 % once the experts are cached, costs ~1.1 GB of VRAM, and ran the card out at 64k |
 | `EFFORT` medium | unlike Qwen3.6, this template reads `reasoning_effort` (default `xhigh`); at ~10 tok/s thinking is the expensive part |
 

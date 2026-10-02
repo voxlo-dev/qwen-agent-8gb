@@ -25,9 +25,11 @@ incomplete, and a change that contradicts one needs a new measurement, not an ar
 | `install.sh` | Step runner: `deps build model pi link`, all of them by default. Runs `preflight` first |
 | `scripts/preflight.sh` | Gates a run before it spends time: disk, RAM, driver, VRAM, Node, port. Reports every item, exits once. `SKIP_PREFLIGHT=1` bypasses it |
 | `scripts/lib.sh` | Sourced first by every step; sources `config.env` and defines `log`/`warn`/`die`/`has` |
-| `scripts/{deps,build,model,pi}.sh` | One install step each, individually re-runnable and idempotent. `deps` and `build` branch on `BACKEND` (`cuda`, `vulkan`) |
+| `scripts/{deps,build,model,pi}.sh` | One install step each, individually re-runnable and idempotent. `deps` and `build` branch on `BACKEND` (`cuda`, `vulkan`); `build` fetches a git commit, or a checksummed release tarball (`LLAMA_TARBALL`) where the commit is not fetchable (Unsloth's tree) |
+| `scripts/server-flags.sh` | The llama-server flags and environment of the selected model and profile, sourced by both launchers. Long spellings only: Unsloth Studio's parser misreads short clusters |
 | `patches/{backend}/*.patch` | Applied by `build` to the fork at `LLAMA_COMMIT`, in name order, for that backend only, and only for a model whose `PATCH_DIR` names them (Bonsai). Today: the PTQ1_0 Vulkan decode, until upstream takes it (T-017) |
-| `bin/bonsai-server` | The launcher. Sources `config.env` **directly**, not through `lib.sh` |
+| `bin/bonsai-server` | The launcher. Sources `config.env` **directly**, not through `lib.sh`, then `scripts/server-flags.sh` |
+| `bin/bonsai-studio` | Opens the same model in Unsloth Studio (`unsloth studio run`) on this repo's build, with the flags from `server-flags.sh` passed through. Same sourcing as `bonsai-server` |
 | `bin/bonsai-pi` | Starts the pinned pi with `PI_CODING_AGENT_DIR` set to `PI_AGENT_DIR`, and starts/stops `bonsai-server` around it when none runs. State in `$BONSAI_HOME/run/`. Same sourcing as `bonsai-server` |
 | `pi/pi-agents.md` | Runtime artifact, copied to `$PI_AGENT_DIR/AGENTS.md`. **Not this file** |
 | `pi/extensions/localagent/` | pi extension behind `bonsai-pi --localagent`: the `dispatch` tool, and the session's `hasUI` for the plan gate. **Frozen, not recommended**: see below |

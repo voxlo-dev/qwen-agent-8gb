@@ -664,6 +664,48 @@ Verified: the URL that `config.env` derives for local, remote and remote-with-po
 `models.json` written from it, and the four autostart branches under `set -e`. Not yet run
 against a real remote server - the machine this was written on has no GPU.
 
+## Unsloth Studio
+
+`bonsai-studio` opens the model `MODEL` names in [Unsloth Studio](https://github.com/unslothai/unsloth)
+instead of a bare llama-server: Studio's chat UI and API, this repo's build and flags. It is
+`unsloth studio run` with three things changed.
+
+- **The build.** `LLAMA_SERVER_PATH` points Studio at `LLAMA_SERVER`, the tree the model file
+  pins. That is the first place Studio looks, ahead of its own `~/.unsloth/llama.cpp`, so Bonsai
+  runs on the fork and Qwen3.8-Flash on the Unsloth tree this repo built, at the pinned source.
+- **The flags.** `scripts/server-flags.sh` holds what `bonsai-server` passes, and `bonsai-studio`
+  hands the same list to Studio, which appends it after its own flags: llama.cpp's last value
+  wins, so the profile's placement, cache types, reasoning budget and `SERVER_ARGS` are what runs.
+  The window goes as `--context-length`, MTP as `--speculative-type mtp` or `off`, one slot as
+  `--parallel 1` (Studio's default of 4 splits `CTX`), sampling as Studio's pinning options,
+  because Studio owns those flags and refuses or rewrites them as raw arguments.
+- **Studio's own picks undone.** `--no-mmproj`, since no profile budgets VRAM for a vision
+  projector that Studio loads when it finds one beside the GGUF; `--load-mode auto`, because Studio
+  reads a model into memory (`none`) when it estimates it fits, and the experts in RAM are
+  measured mmapped.
+
+Two details of Studio's parser decide how the flags are written. Its **manual** memory mode
+strips every offload flag from the pass-through and has no command line option for the expert
+count, so `bonsai-studio` stays in **auto**, which keeps an explicitly requested window ("no
+silent shrink") and passes the flags through untouched. And its command line reads a short
+cluster as its own options: `-ctxcp 4` ends in `-p`, its port. `server-flags.sh` and the model
+files therefore use long spellings only (`--n-gpu-layers`, `--ctx-checkpoints`, ...), and so must
+extra arguments to `bonsai-studio`.
+
+Studio adds flags of its own that are left alone: `--metrics`, `--slot-save-path` (it saves a
+slot's KV cache to disk when it unloads an idle model), `--chat-template-kwargs` with the same
+`preserve_thinking: false` as `PRESERVE_THINKING`, `--video-fps`, and for Bonsai
+`--ctx-checkpoints 21` against llama.cpp's 32, sized from host RAM. It also sends a system prompt and
+tool definitions of its own, ~1.3k tokens on a one-line question. Its port is 8888, it has its own
+login and API keys, and `bonsai-pi` does not talk to it: pi stays on `bonsai-server`.
+
+Verified on 2026-10-02 with Studio 2026.9.12 (`unsloth` package), headless and without the GPU,
+which the agent sandbox does not have: for all three models Studio started our build with every
+flag of the profile last on its command line and loaded at the profile's window. Qwen3.6 and
+Qwen3.8-Flash answered a chat request through its API on the CPU (21 tok/s with MTP accepting
+55 %, and 6.2); Bonsai's ternary weights read a prompt on the CPU too slowly to wait for. Not yet
+run with the card, so VRAM and speed under Studio are unmeasured (T-038).
+
 ## localagent workflow
 
 `bonsai-pi --localagent` runs a multi-agent build pipeline for this model. **Decided
@@ -752,7 +794,7 @@ be gone by the time this one starts. See [VRAM budget](#vram-budget).
 | `apt offers CUDA 12.0 here` from `deps` or preflight | Ubuntu 24.04 or a derivative. Install [CUDA from NVIDIA's repository](#cuda-from-nvidias-repository), then `./install.sh`. |
 | `cmake: command not found` in `build` | `deps` was skipped. Run it, or install `cmake` yourself; preflight now says so first. |
 | `node: v18... - nvm has v24...` | nvm is loaded by `~/.bashrc` only. Run from an interactive shell, or `source ~/.nvm/nvm.sh`. |
-| `prebuilt ... has no CUDA backend` from `build` (Qwen3.8-Flash) | Unsloth was installed before the NVIDIA driver worked and chose Vulkan or CPU. Repair it in Studio. |
+| `prebuilt ... has no CUDA backend` from `build` (Qwen3.8-Flash on Studio's prebuilt, `LLAMA_PREBUILT=unsloth`) | Unsloth was installed before the NVIDIA driver worked and chose Vulkan or CPU. Repair it in Studio. |
 | `preflight: N problem(s)` | Each line above it says what and how. `SKIP_PREFLIGHT=1 ./install.sh` goes ahead anyway. |
 | `preflight` warns that VRAM is already in use | A desktop or another server is on the card. `PROFILE=display`, or free it. See [VRAM budget](#vram-budget). |
 | `download failed` from `model` | Run `./install.sh model` again; `curl -C -` resumes from the `.part` file. |
