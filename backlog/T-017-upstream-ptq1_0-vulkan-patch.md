@@ -19,7 +19,7 @@ fork's `CONTRIBUTING.md` needs an author who can defend every line without AI he
 <https://github.com/PrismML-Eng/llama.cpp/issues/185#issuecomment-5759986235> under `voxlo-dev`;
 its patch link points at `main` of this repo, so the file stays at that path. On 2026-09-24 the
 maintainer pointed at #252 (dedicated PTQ1_0 `mul_mat_vec` for cards without integer dot).
-Measured on the RX 570 (`runs/T-017-pr252-rx570/`, [dev.md](../docs/dev.md#other-gpu-backends)):
+Measured on the RX 570 (`runs/T-017-pr252-rx570/`, [bonsai.md](../docs/bonsai.md#other-gpu-backends)):
 #252 matches the patch on generation, so only its `mul_mm` half (+50 % on prompts) is still
 unique. Comment texts for #252 and the correction on #185 are in that run folder.
 `upstream-pr-body.md` and `upstream-commands.sh` in `runs/T-016-ptq1_0-vulkan-decode/` are the PR
@@ -35,7 +35,7 @@ path, kept in case the decision is revisited.
 1. Move `LLAMA_COMMIT`, run the CUDA build, and the RX 570 measurement
    (`runs/T-016-ptq1_0-vulkan-decode/measure.sh`).
 2. Generation no slower than 143 ms/token and prompts as fast: delete `patches/vulkan/`, and the
-   patch mentions in `README.md`, `AGENTS.md` and `docs/dev.md#other-gpu-backends`.
+   patch mentions in `README.md`, `AGENTS.md` and `docs/bonsai.md#other-gpu-backends`.
 3. #252 without a faster `mul_mm` loader: decide whether +50 % on prompts is worth a patch; if
    yes, cut it down to the `mul_mm` half. Slower: keep the patch and rebase it.
 

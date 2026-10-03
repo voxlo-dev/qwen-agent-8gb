@@ -77,5 +77,5 @@ body:
     attributes:
       label: Before you file
       options:
-        - label: I read the troubleshooting table in docs/dev.md and my case is not in it
+        - label: I read the troubleshooting table in docs/setup.md and my case is not in it
         - label: The GPU drives no display, or I am using PROFILE=display

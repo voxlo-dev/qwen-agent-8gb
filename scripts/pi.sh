@@ -72,7 +72,7 @@ settings = load("settings.json")
 settings.update(defaultProvider="local", defaultModel=os.environ["ALIAS"])
 # pi's defaults (reserve 16384, keepRecent 20000) assume a 200k window. At 48k they leave
 # ~8k of working room and the post-compaction context stays above the trigger, so pi
-# compacts on every turn. See docs/dev.md#context-budget.
+# compacts on every turn. See docs/agent.md#context-budget.
 settings.setdefault("compaction", {}).update(
     reserveTokens=int(os.environ["RESERVE_TOKENS"]),
     keepRecentTokens=int(os.environ["KEEP_RECENT_TOKENS"]),

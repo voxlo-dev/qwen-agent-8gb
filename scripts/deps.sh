@@ -3,7 +3,7 @@
 # Installs the build toolchain via apt for BACKEND (cuda or vulkan). Needs sudo, so run it from a
 # real terminal. CUDA is tested on Ubuntu 26.04, Vulkan on Debian 13; where apt's CUDA is older
 # than 12.4 (Ubuntu 24.04) it keeps an nvcc from NVIDIA's repository. Other systems bring the
-# toolchain themselves, see docs/dev.md#toolchain.
+# toolchain themselves, see docs/setup.md#toolchain.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 case "$BACKEND" in
@@ -14,14 +14,14 @@ case "$BACKEND" in
     pkgs=(build-essential cmake ccache git curl python3 gcc-13 g++-13)
     # An nvcc >= 12.4 from anywhere (NVIDIA's repository, a runfile) is used as it is. Otherwise
     # apt's toolkit, but only where apt has one that new: Ubuntu 24.04 offers 12.0, 22.04 11.5,
-    # Debian 13 none in main. See docs/dev.md#cuda-from-nvidias-repository.
+    # Debian 13 none in main. See docs/setup.md#cuda-from-nvidias-repository.
     have="$(nvcc_version)"
     if [[ -n "$have" ]] && version_ge "$have" 12.4; then
       log "using the installed nvcc $have"
     else
       cand="$(apt_cuda_version)"
       [[ -n "$cand" ]] && version_ge "$cand" 12.4 \
-        || die "apt offers CUDA ${cand:-nothing} here (nvidia-cuda-toolkit)${have:+ and nvcc $have is installed}, the build needs >= 12.4 - install cuda-toolkit-12-9 from NVIDIA's repository, then run ./install.sh again: docs/dev.md#cuda-from-nvidias-repository"
+        || die "apt offers CUDA ${cand:-nothing} here (nvidia-cuda-toolkit)${have:+ and nvcc $have is installed}, the build needs >= 12.4 - install cuda-toolkit-12-9 from NVIDIA's repository, then run ./install.sh again: docs/setup.md#cuda-from-nvidias-repository"
       pkgs+=(nvidia-cuda-toolkit)
     fi
     ;;
@@ -58,7 +58,7 @@ case "$BACKEND" in
     # RADV_PERFTEST=nogttspill, which bonsai-server sets, is silently ignored below Mesa 25.2
     # and is worth 1.22x on this model. Debian 13 ships 25.0.7; trixie-backports has 26.x.
     if [[ "$driver" =~ ^[0-9]+\.[0-9]+ ]] && [[ "$(printf '%s\n' 25.2 "$driver" | sort -V | head -1)" != 25.2 ]]; then
-      warn "Mesa $driver is older than 25.2: RADV_PERFTEST=nogttspill will be ignored, expect ~1.2x slower - see docs/dev.md#other-gpu-backends"
+      warn "Mesa $driver is older than 25.2: RADV_PERFTEST=nogttspill will be ignored, expect ~1.2x slower - see docs/bonsai.md#other-gpu-backends"
     fi
     ;;
 esac

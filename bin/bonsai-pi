@@ -4,7 +4,7 @@
 # A global pi and ~/.pi are not used. Arguments go straight to pi.
 # With SERVER_AUTOSTART, starts bonsai-server in the background when none is running and stops it
 # once the last bonsai-pi session ends - only for a server on this machine; a remote SERVER_HOST
-# is expected to be serving already. Rationale: docs/dev.md#server-lifecycle.
+# is expected to be serving already. Rationale: docs/agent.md#server-lifecycle.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
 source "$ROOT/config.env"
@@ -13,7 +13,7 @@ say() { printf '\033[1;36m==>\033[0m %s\n' "$*" >&2; }
 die() { printf '\033[1;31mxx\033[0m %s\n' "$*" >&2; exit 1; }
 
 # A server that fails to start says why in its log, and nobody reads a log they are only pointed
-# at. The usual causes are in docs/dev.md#troubleshooting: VRAM held by something else, a stale
+# at. The usual causes are in docs/setup.md#troubleshooting: VRAM held by something else, a stale
 # process on PORT, a model file that is not there.
 die_with_log() {
   printf '\033[1;31mxx\033[0m %s\n' "$1" >&2
@@ -22,7 +22,7 @@ die_with_log() {
     tail -20 "$SERVER_LOG" >&2
     printf -- '--- end ---\n\n' >&2
   fi
-  printf 'Troubleshooting: docs/dev.md#troubleshooting\n' >&2
+  printf 'Troubleshooting: docs/setup.md#troubleshooting\n' >&2
   exit 1
 }
 
@@ -80,7 +80,7 @@ if [[ "$autostart" == "true" ]]; then
   trap 'exit 143' TERM
   trap 'exit 130' INT
   trap 'exit 131' QUIT
-  # A server left behind by a session that died without its trap (see docs/dev.md#server-lifecycle)
+  # A server left behind by a session that died without its trap (see docs/agent.md#server-lifecycle)
   # is adopted here: its pid stays in server.pid, so this session stops it when it leaves.
   pid="$(cat "$run/server.pid" 2>/dev/null || true)"
   if ! healthy && ! alive "$pid"; then
