@@ -28,7 +28,8 @@ venv's CUDA 13 runtime on the library path and runs on the CPU alone, silently, 
 T-038 `build` compiles the same source itself into `llama.cpp-unsloth`: the source commit
 `a3c12db` cannot be fetched from Unsloth's repository, so the pin is the release tarball the
 prebuilt was built from, with its sha256, and the result reports the same build 11160. Statically
-linked against the system's CUDA 12.9 like the other two trees, it needs nothing from Studio.
+linked against the system's CUDA 12.9 like the other two trees, it needs nothing from Studio,
+but CCCL 3.2 instead of the toolkit's (below, *Filled*).
 
 Measured against the prebuilt on 2026-10-02 (native Linux, headless, the same 131k buffers,
 interleaved built, prebuilt, built; `runs/T-038-unsloth-tree/`): VRAM 7 566 against 7 568 MiB,
@@ -52,6 +53,25 @@ three 256-token turns at 18.1-18.9 tok/s against 17.8-18.5, the 5k prompt warm a
 cache, bounds it. 131k at `q8_0`/`q8_0` and ub 512 is 7 386 MiB. 262k fits with `q4_0`/`q4_0` and ub
 256 (7.56 GB, the same tg, prompts at ~29 tok/s): `CTX=262144 KV_K=q4_0 KV_V=q4_0 UB=256
 bonsai-server`. KV quality at `q4_0` is not measured for this model.
+
+**Filled, it needs CCCL 3.2** (T-049, 2026-10-03, `runs/T-049-flash-deep/`). Built against
+CUDA 12.9 alone, the server died in both T-046 sessions at ~48k of context, and on a fresh
+110k prompt at 19k: `CUDA error: out of memory` in `cuMemCreate`, from `ggml_cuda_op_top_k`. The
+indexer picks its blocks with a top-k over [depth x ubatch rows] scores. With CCCL >= 3.2 that is
+`cub::DeviceTopK`, row by row; below (12.9 ships 2.8) ggml falls back to a full segmented sort,
+with four or five temporaries of that size from the CUDA pool, which grows outside the reserved
+buffers and never shrinks. On the card it grew ~11 MiB per 1k of depth at 512 rows, from 7 566 MiB
+to the end of the card. An agent's prompts are mostly a few hundred tokens or one, which is why
+the sessions got further. The prebuilt is CUDA 13.3 and never took that path; T-038 compared VRAM
+at load, where the pool is empty, and the deepest earlier run was 31k.
+
+`LLAMA_CMAKE_ARGS=-DGGML_CUDA_CUB_3DOT2=ON` in the model file: the tree's own switch, which
+fetches CCCL v3.2.0 at build time (a git tag, not checksummed) and keeps the system's 12.9. The
+same 110k prompt then reads through without error: VRAM flat at 7 592-7 594 MiB from 0 to 110k,
+the prompt at 97 tok/s on average, 64 tokens after it at 9.7 tok/s. CUDA 13 is not needed for
+it, and would cut the toolkits from apt that the build accepts today. Rebuilt through
+`install.sh build` with the setting, the installed binary gave the same: 110k at 97.4 tok/s, 10.0
+tok/s after it, VRAM flat at 7 594 MiB.
 
 **Measured through `bonsai-server`** (T-039, 2026-09-29, prebuilt b11160, `dedicated`, 50 GB WSL2;
 native Linux in [its own section](#native-linux-every-expert-cached)):
@@ -110,4 +130,10 @@ margin, and `UD-Q3_K_XL` (experts 52.0 GiB), which is no longer needed.
 
 ## In an agent session
 
-One Tron session, D (2026-09-29, under WSL2): [agent-sessions.md](agent-sessions.md#d-qwen38-flash).
+Three Tron sessions ([agent-sessions.md](agent-sessions.md)): D (2026-09-29, under WSL2) ended in
+54 minutes with a game whose rematch works; E and ES (T-046, 2026-10-03/04, native) did not end
+inside 90 minutes, both building sound, fonts and test setups of their own. ES ran with the Sharp
+chat template and ran clearly better on process (ended on its own, 89 steps against 198), one pair
+only, so it is not wired yet and T-050 validates it: the pinned template and its render
+check against Flash's own (Sharp makes the same two changes as on Bonsai; Flash's own template
+renders what pi sends byte for byte like Bonsai's) are in `runs/T-041-tron-day-2/`.

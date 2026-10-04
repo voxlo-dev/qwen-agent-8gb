@@ -10,6 +10,7 @@ native Linux since 2026-09-29.
 - **`GGML_CUDA_FA_ALL_QUANTS=ON`**: without it, CUDA flash attention only handles K and V of the *same* type. A mixed cache such as `q8_0`/`q4_0` then falls back to the CPU. Generation speed dropped from 34 to 20 tok/s at 2k context and down to 8 tok/s at 10k, with the GPU at 39 % load.
 - **gcc-13 as CUDA host compiler**: Ubuntu's CUDA 12.4 `nvcc` refuses gcc newer than 13, and newer Ubuntu releases default to gcc 15.
 - **`CMAKE_CUDA_ARCHITECTURES`** comes from `nvidia-smi` (`89` for Ada). Compiling for one architecture is much faster than for the default set.
+- **`GGML_CUDA_CUB_3DOT2=ON`**, Unsloth's tree on CUDA only (`LLAMA_CMAKE_ARGS` in the Qwen model files): cmake fetches CCCL v3.2.0 from NVIDIA's GitHub at configure time, so that build needs github.com, and the toolkit's own CCCL (2.8 in 12.9) is not used. Without it Qwen3.8-Flash's sparse attention runs the CUDA pool out of the card at 19-48k of context ([qwen38-flash.md](qwen38-flash.md), T-049). Any toolkit >= 12.4 works with it; CUDA 13 is not needed.
 - **ccache** speeds up rebuilds and is used when present; the build works without it.
 - OpenSSL is not needed: it only enables HTTPS model downloads inside llama-server, and `bonsai-server` passes a local path.
 - **Vulkan** (`BACKEND=vulkan`): `GGML_VULKAN=ON` and the patches from `patches/vulkan/` applied to

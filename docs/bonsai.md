@@ -28,7 +28,7 @@ Architecture (`qwen35`): 64 blocks, every 4th is full attention (16 layers, 4 KV
 | KV cache, per 1k tokens, `q8_0`/`q8_0` | 34 |
 | KV cache, per 1k tokens, `q8_0`/`q4_0` | 26 |
 
-At 48k context with `q8_0`/`q4_0` the process holds ~7.3 GB of 8 GB. **64k is the default**: measured at 7 747 MiB of 8 188, 36 tok/s at short context and no layer on the CPU - 441 MiB to spare, which is why the GPU must drive no display.
+At 48k context with `q8_0`/`q4_0` the process holds ~7.3 GB of 8 GB. **64k is the default**: measured at 7 747 MiB of 8 188, 36 tok/s at short context and no layer on the CPU - 441 MiB to spare, which is why the GPU must drive no display. Filled with one 60 000-token prompt (T-049, 2026-10-03, headless): read at 396 tok/s, 23.2 tok/s after it, VRAM at 7 758-7 768 MiB throughout, no growth.
 
 **More than 64k only through the cache type**: 96k fits at `q4_0`/`q4_0` (18 MiB per 1k) and reads that depth cleanly, and nothing larger stays on the card. Under WSL2 a window that is too large does not fail to load. It spills into shared memory once the cache fills, and the VRAM reading does not show it. The measurements, and how to test a window at depth, are in [context-window.md](context-window.md). Qwen3.6, `MODEL=qwen36-35b`, has its own budget with the experts in RAM: [qwen36.md](qwen36.md).
 

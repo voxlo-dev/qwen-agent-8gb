@@ -119,7 +119,8 @@ fi
 # caught, bash resets it for pi, which still gets it as usual.
 trap : INT
 status=0
-# The localagent extension reads its limits from the environment, so config.env stays the source.
+# The extensions read their limits from the environment, so config.env stays the source.
 export LOCALAGENT_MAX_TURNS="$AGENT_MAX_TURNS" LOCALAGENT_AGENT_MODEL="local/$AGENT_MODEL_ID"
+export BONSAI_TOOL_TIMEOUT="$TOOL_TIMEOUT"
 PI_CODING_AGENT_DIR="$PI_AGENT_DIR" "$PI_BIN" "$@" 9>&- || status=$?
 exit "$status"

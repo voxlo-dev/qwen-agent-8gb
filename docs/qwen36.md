@@ -92,6 +92,12 @@ at ~700.
 shipped config at 7 374 MiB, ~480 below the edge ([context-window.md](context-window.md#the-edge-you-cannot-see)).
 37 would sit at ~7 840, too close.
 
+**Filled** (T-049, 2026-10-03, on the build with CCCL 3.2 it shares with Qwen3.8-Flash): one
+110 000-token prompt in 2048-token ubatches read at 772 tok/s, 64 tokens after it at 36.4 tok/s,
+VRAM at 7 360-7 374 MiB throughout, no growth. Qwen3.6 has no sparse attention and never took
+the top-k path that ran Flash out of the card ([qwen38-flash.md](qwen38-flash.md)); the build
+flag is for Flash and costs this model nothing measurable.
+
 **Thinking in the prompt** behaves as with Bonsai: `--reasoning-preserve` renders every earlier
 thinking block, `--no-reasoning-preserve` only those after the last user message. Mainline has the
 same switch, so `PRESERVE_THINKING` works unchanged. The template reads `enable_thinking` and

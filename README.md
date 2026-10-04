@@ -220,6 +220,7 @@ bonsai-server --port 9000
 | `PI_VERSION` | `0.85.1` | pi version the context budget was measured with |
 | `SERVER_AUTOSTART` | `true` | let `bonsai-pi` start and stop the server |
 | `SERVER_START_TIMEOUT` | `300` | seconds `bonsai-pi` waits for the model to load |
+| `TOOL_TIMEOUT` | `300` | seconds after which a bash call the model starts without its own timeout is ended; `0` turns it off, see [Tool timeout](docs/agent.md#tool-timeout) |
 | `UNSLOTH_CLI` | Studio's venv | the `unsloth` command `bonsai-studio` runs; falls back to one on `PATH` |
 
 After changing the profile, `CTX`, `SERVER_HOST`, `PORT`, `MAX_TOKENS`, `RESERVE_TOKENS` or `KEEP_RECENT_TOKENS`, run `./install.sh pi` again so pi's config matches the server.

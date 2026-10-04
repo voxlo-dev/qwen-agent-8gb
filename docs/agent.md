@@ -159,6 +159,25 @@ pi's per-project override and intended.
 
 pi reads providers from `models.json`. `contextWindow` decides when pi compacts, together with the settings under [Context budget](#context-budget) - not `maxTokens`, which is only the per-turn output cap. Unsloth's `unsloth start pi` hard-codes `maxTokens = min(context / 4, 8192)`, which cuts a single long reasoning turn off at 8k. That is why this setup uses its own config.
 
+### Tool timeout
+
+pi's bash tool has no default timeout: a call without one runs until it returns or someone
+presses Escape. A server started in the foreground, or a test that waits for a socket that never
+answers, holds the whole session. In the Tron sessions on the 4060 Ti machine that happened four
+times in 534 tool calls, all with Qwen3.8-Flash or Swift-Bonsai-2 (W, ES), each aborted by hand
+after 5-15 minutes, and each time the model needed a `Resume.` to go on. None of the calls that
+returned took longer than 3.8 minutes; the long ones were the models' own match simulations,
+mostly wrapped in a `timeout` of their own.
+
+The `tool-timeout` extension (`pi/extensions/tool-timeout/`, installed by `install.sh pi`) gives
+every bash call that has no `timeout` the one in `TOOL_TIMEOUT`, 300 seconds by default; the
+model's own value is left alone. pi then kills the process tree and returns `Command timed out
+after 300 seconds` as a tool error, which the model reads like any other result and the session
+goes on. `bonsai-pi` passes the value in the environment, so changing it needs no `install.sh pi`;
+`TOOL_TIMEOUT=0` turns it off. The agent prompt says so in one line, so a step that needs longer
+can ask for it. Not yet seen in a session: the value is from the timings above, not from a run
+with it.
+
 ## Server lifecycle
 
 `bonsai-pi` owns the server only when it started it. On start it checks `/health` on `PORT`;

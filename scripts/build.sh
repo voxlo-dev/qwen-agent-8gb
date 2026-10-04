@@ -15,6 +15,7 @@ want="$LLAMA_COMMIT $BACKEND $(cat "${patches[@]}" /dev/null | sha256sum | cut -
 # An unpatched CUDA build keeps the old stamp format, so existing installs do not rebuild for nothing.
 [[ "$BACKEND" == cuda && ${#patches[@]} -eq 0 ]] && want="$LLAMA_COMMIT"
 [[ -n "$LLAMA_TARBALL" ]] && want="$want ${LLAMA_TARBALL_SHA256:0:12}"
+[[ -n "$LLAMA_CMAKE_ARGS" ]] && want="$want $LLAMA_CMAKE_ARGS"
 
 stamp="$LLAMA_DIR/build/.bonsai-commit"
 if [[ -z "${FORCE:-}" && -x "$LLAMA_SERVER" && "$(cat "$stamp" 2>/dev/null)" == "$want" ]]; then
@@ -65,6 +66,7 @@ launchers=()
 has ccache && launchers=(-DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache)
 
 backend_flags=()
+[[ -n "$LLAMA_CMAKE_ARGS" ]] && read -ra backend_flags <<<"$LLAMA_CMAKE_ARGS"
 case "$BACKEND" in
   cuda)
     arch="$CUDA_ARCH"

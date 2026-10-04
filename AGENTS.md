@@ -32,6 +32,7 @@ incomplete, and a change that contradicts one needs a new measurement, not an ar
 | `bin/bonsai-studio` | Opens the same model in Unsloth Studio (`unsloth studio run`) on this repo's build, with the flags from `server-flags.sh` passed through. Same sourcing as `bonsai-server` |
 | `bin/bonsai-pi` | Starts the pinned pi with `PI_CODING_AGENT_DIR` set to `PI_AGENT_DIR`, and starts/stops `bonsai-server` around it when none runs. State in `$BONSAI_HOME/run/`. Same sourcing as `bonsai-server` |
 | `pi/pi-agents.md` | Runtime artifact, copied to `$PI_AGENT_DIR/AGENTS.md`. **Not this file** |
+| `pi/extensions/tool-timeout/` | pi extension, always loaded: a bash call without its own `timeout` gets `TOOL_TIMEOUT` (300 s), so a hung command ends as a tool error instead of holding the session |
 | `pi/extensions/localagent/` | pi extension behind `bonsai-pi --localagent`: the `dispatch` tool, and the session's `hasUI` for the plan gate. **Frozen, not recommended**: see below |
 | `pi/localagent-workflow/` | The workflow it runs: skill, five agent prompts (orchestrator, scaffold, worker, e2e, docs), templates. Descended from the author's seven-agent workflow in `docs/model-comparison.md`; every cut since is measured in `docs/localagent.md` |
 
@@ -78,6 +79,7 @@ framework, and what breaks is behaviour under a real model on a real card. Verif
 | Any script | `bash -n`, and run the step twice to confirm it is still idempotent |
 | Preflight | run it where it should fail (no GPU, wrong `BACKEND`, too little disk): one screen, nothing touched |
 | Server flags | start it, query `http://127.0.0.1:8080/props`, or render a conversation through `/apply-template` |
+| A window, a profile, a tree or a build flag | fill it: one prompt to `CTX - RESERVE_TOKENS` in full ubatches, `nvidia-smi` alongside (`runs/T-049-flash-deep/`). A window that loads is not a window that holds: the CUDA pool grows outside the reserved buffers |
 | Vulkan kernels | generation and an ~850-token prompt at a stated window, judged by tok/s. VRAM is misleading: RADV only reports it meaningfully after the first request |
 | pi's config | read back `$BONSAI_HOME/pi-agent/{models,settings}.json` |
 | pi's behaviour | its session logs, JSONL under `$BONSAI_HOME/pi-agent/sessions/{cwd-slug}/`, one entry per message with `usage` counts and `compaction` records. That is where a context problem is visible |

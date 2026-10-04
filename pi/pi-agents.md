@@ -20,4 +20,5 @@ results, not what was worked out while thinking.
 - In a summary, what you ran and what it showed is what the user can rely on. What you did not get
   to check is worth saying too.
 - A server or watcher started in the background keeps running, and keeps its port, until it is
-  stopped.
+  stopped. A command that does not return on its own ends after a few minutes as timed out; one
+  that needs longer can pass its own `timeout`.

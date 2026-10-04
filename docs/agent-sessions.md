@@ -28,6 +28,8 @@ row at temperature 1.0: a reading, not a ranking.
 | C2 | 2026-10-02, native | Bonsai 64k | 93 min, cap | no | well below the first day |
 | W | 2026-10-02, native | Swift-Bonsai-2 64k, no agent prompt | 126 min, stopped | no | marginally better than C2 |
 | B2 | 2026-10-02, native | Qwen3.6 131k | 18 min | yes | **runs, browser-tested end to end** |
+| E | 2026-10-03/04, native | Qwen3.8-Flash 131k | 242 min active, stopped | no | never said done; sound effects, custom fonts, a test harness of its own |
+| ES | 2026-10-03/04, native | Qwen3.8-Flash 131k, Sharp template | 175 min active | yes, at 175 min | the same kind of game; ended on its own in fewer steps than E |
 
 ## First day: A, B, C, D
 
@@ -186,3 +188,47 @@ summary says which were browser checks. Rematch is not among them.
 **That ships it.** B met "a working game ships it" already, B2 is the second reading, on a different
 OS and with a different agent prompt. Thinking stays a non-issue: ~6k tokens over 96 steps,
 against ~66k for Bonsai over 86 on the same day.
+
+## Third day: E and ES, Qwen3.8-Flash with and without Sharp
+
+**T-046, 2026-10-03/04, native Linux**, terminal only, every expert cached, the `dedicated`
+profile as shipped. E as shipped; ES the same with the Sharp chat template v22.5.0
+(`peculiar-ragdoll/Qwen-Sharp-Chat-Templates` at `85461fc`, pinned in `runs/T-041-tron-day-2/`),
+which on this model adds a terseness block after the system prompt and stricter tool-call
+instructions. Own pi dirs, the same protocol.
+
+Neither ran to plan. Both servers died at ~49 minutes and ~48k of context on a CUDA out-of-memory
+in the pool, a bug of the build, not of the model, found and fixed in T-049
+([qwen38-flash.md](qwen38-flash.md)); both were resumed the next day with pi's `--continue` and a
+`Resume.`. ES also had two tool calls that never returned (a server started in the foreground, a
+font check with Playwright), aborted by hand after 10 minutes each, and one more input. No session
+reached the study's follow-up.
+
+| | E | ES (Sharp) |
+| --- | --- | --- |
+| Active time (gaps over 30 min left out) | 242 min, stopped by the operator | 175 min, said done |
+| Steps / output tokens | 198 / 133.7k | 89 / 100.8k |
+| Largest turn | 7.0k | 11.8k |
+| Compactions / peak context | 2, at 99.9k and 99.4k / 99.9k | 0 / 85.0k |
+| tok/s per step, median, incl. prompt | 11.9 | 12.2 |
+| Inputs beyond the prompt | 2 x `Resume.` | 4: `Resume.` after the crash and after both hangs, once with a reminder |
+| What it built | server, client, two pixel fonts, Web Audio sound, six test tools of its own | server, client, sound, browser tests and 11 screenshots |
+
+**What it decides:**
+
+- **Sharp stays open.** ES ran clearly better on every count of the process: it ended on its
+  own, in 89 steps against 198, with 25 % less output, no compaction against two, and 175 active
+  minutes against 242 without an end. One pair at temperature 1.0, with different interruptions,
+  is not enough to wire it: T-050 runs it as one of its variables. Until then no
+  `CHAT_TEMPLATE_FILE` setting; the pinned template stays in `runs/T-041-tron-day-2/`.
+- **Flash builds too much.** Both sessions reached for sound, custom fonts, visual effects and a
+  test setup that needed debugging of its own, the pattern A showed for Bonsai. D, the same model
+  under WSL2, ended in 54 minutes; here neither ended inside the 90-minute cap.
+- **The harness matters more than the model's tuning.** The author's reading over all sessions:
+  the Swift fine-tune (W) moved little, while the harness moved a lot:
+  Qwen3.6 works clearly better in pi than in OpenCode. The four hung tool calls (W, ES) are why
+  pi now gets a default bash timeout ([agent.md](agent.md#tool-timeout)).
+- **This test does not separate the candidates any more.** The outcome of one Tron session is
+  close to chance: Bonsai built a working game in a first, undocumented run and never again,
+  Qwen3.6 went from B's to B2's, Flash from D to E. A reproducible test is T-050.
+
