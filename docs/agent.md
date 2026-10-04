@@ -274,13 +274,31 @@ slot's KV cache to disk when it unloads an idle model), `--chat-template-kwargs`
 tool definitions of its own, ~1.3k tokens on a one-line question. Its port is 8888, it has its own
 login and API keys, and `bonsai-pi` does not talk to it: pi stays on `bonsai-server`.
 
+**One model per start.** `LLAMA_SERVER_PATH` holds for the whole Studio process, so a model picked
+in Studio's model list afterwards runs on the tree of the `MODEL` `bonsai-studio` was started
+with, under Studio's own flags (window 8192, none of the profile). Seen on 2026-10-04: started as
+Bonsai, Qwen3.6 then loaded on Bonsai's fork at 45.5 tok/s, and Qwen3.8-Flash failed with
+`unknown model architecture: 'qwen4exp'`, which only Unsloth's tree knows. Another model means
+quitting Studio and `MODEL=… bonsai-studio`.
+
 Verified on 2026-10-02 with Studio 2026.9.12 (`unsloth` package), headless and without the GPU,
 which the agent sandbox does not have: for all three models Studio started our build with every
 flag of the profile last on its command line and loaded at the profile's window. Qwen3.6 and
 Qwen3.8-Flash answered a chat request through its API on the CPU (21 tok/s with MTP accepting
-55 %, and 6.2); Bonsai's ternary weights read a prompt on the CPU too slowly to wait for. Not yet
-run with the card, so VRAM and speed under Studio are unmeasured (T-043): the agent sandbox runs
-Studio, and with it its llama-server, without the GPU.
+55 %, and 6.2); Bonsai's ternary weights read a prompt on the CPU too slowly to wait for.
+
+**On the card Studio costs nothing** (T-043, 2026-10-04, headless, from the user's shell, each
+model started with its own `MODEL`): VRAM and decode speed equal those of `bonsai-server`.
+
+| Model | VRAM under Studio | `bonsai-server` | tg under Studio | `bonsai-server` |
+| --- | --- | --- | --- | --- |
+| Bonsai, 64k | 7 748 MiB loaded, 7 758 after an answer | 7 747 / 7 758 | 36.1 tok/s | 36.6 |
+| Qwen3.6, 131k, MTP | 7 260 MiB | 7 278 | 62.8 | 52-65 |
+| Qwen3.8-Flash, 131k | 7 580 MiB | 7 566 | 17.0 | 18.6-18.9 warm |
+
+Flash's 17.0 tok/s (and 27 tok/s on the prompt) was a first pass right after another model, with
+experts still coming from the SSD: the level of a cold pass under `bonsai-server` (17.8). Studio's
+extra flags and its ~1.3k-token system prompt leave Bonsai's 441 MiB of margin where it was.
 
 ## localagent workflow
 
