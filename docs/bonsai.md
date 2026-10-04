@@ -1,7 +1,9 @@
 # Bonsai: Ternary-Bonsai-2-27B
 
 `MODEL=bonsai`: a dense 27B in Prism's ternary `PTQ1_0`, every layer on the card, served by
-PrismML's llama.cpp fork. This file holds what is particular to it: the format, the VRAM
+PrismML's llama.cpp fork. The default until T-044 (2026-10-04); now the model for a machine without
+RAM to spare, for simple tasks, since its agent sessions on a whole project fell behind Qwen3.6's
+([agent-sessions.md](agent-sessions.md)). This file holds what is particular to it: the format, the VRAM
 budget, the KV cache, the template's reasoning, sampling, and the Vulkan path. The pi budget
 measured on it is in [agent.md](agent.md#context-budget), its windows in
 [context-window.md](context-window.md#bonsai-windows-on-8-gb), its speed ceiling in
@@ -246,13 +248,13 @@ Three things moved it, measured one at a time at 16k:
 **So: CUDA for interactive use, Vulkan for batch.** 7 tok/s is a fifth of the 4060 Ti and
 54 tok/s prompt an eighth: a 4k-token agent prompt costs ~75 s before the first token, a
 10k-token agent step ~25 minutes. That is fine for a task handed over and left alone
-(`bonsai-pi -p`) and not for a conversation, which is why `vulkan` is
+(`qwen-pi -p`) and not for a conversation, which is why `vulkan` is
 supported and not the default. How the setup does it, all of it measured above:
 
 - `BACKEND=vulkan` builds the fork with `GGML_VULKAN=ON` and `patches/vulkan/` applied; the
   pinned `LLAMA_COMMIT` does not carry the decode until upstream takes it (T-017). Same
   binary flags otherwise, same KV types, same `-fa on`.
-- `bonsai-server` exports `RADV_PERFTEST=nogttspill` (1.22x; needs Mesa >= 25.2, `deps` warns
+- `qwen-server` exports `RADV_PERFTEST=nogttspill` (1.22x; needs Mesa >= 25.2, `deps` warns
   below that), and `GGML_VK_DISABLE_HOST_VISIBLE_VIDMEM=1`. That one is neutral for Bonsai
   (143.81 vs 144.07 ms/token at 64k) and 2.3x on Qwen's repeated requests, whose checkpoint writes
   otherwise push buffers out of the 256 MiB of CPU-visible VRAM

@@ -1,4 +1,4 @@
-<!-- bonsai-local: global guidance for pi, installed to $BONSAI_HOME/pi-agent/AGENTS.md by scripts/pi.sh.
+<!-- qwen-agent-8gb: global guidance for pi, installed to $PI_AGENT_DIR/AGENTS.md by scripts/pi.sh.
      Not this project's AGENTS.md - that one is in the repo root. -->
 
 ## Working here

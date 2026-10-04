@@ -1,13 +1,13 @@
 # The localagent workflow
 
-**Not recommended. Use `bonsai-pi` without the flag.** On this model the workflow has finished
+**Not recommended. Use `qwen-pi` without the flag.** On this model the workflow has finished
 only a toy task, and there it was no faster than the model working alone. On the one real task
 measured it failed where the model alone succeeded. It is frozen since 2026-09-23 and stays in the
 repo unchanged, for a stronger local model. [Status](#status) has the numbers.
 
 A multi-agent build pipeline for a weak local model: plan gate, then one worker dispatch per
 small unit (spec -> tests -> code -> test run), then e2e and docs. It lives in
-[`pi/localagent-workflow/`](../pi/localagent-workflow/) and runs as `bonsai-pi --localagent`
+[`pi/localagent-workflow/`](../pi/localagent-workflow/) and runs as `qwen-pi --localagent`
 through the extension in [`pi/extensions/localagent/`](../pi/extensions/localagent/).
 
 The idea was context discipline, not throughput. A 27B model holds a feature badly and forgets
@@ -21,8 +21,8 @@ why it is not recommended. The window and compaction numbers it runs inside are 
 
 ## Status
 
-**Not recommended, and frozen since 2026-09-23.** The core of this repo - `bonsai-server` and
-`bonsai-pi` - is not affected. This workflow does not do what it is for on this model, and it is
+**Not recommended, and frozen since 2026-09-23.** The core of this repo - `qwen-server` and
+`qwen-pi` - is not affected. This workflow does not do what it is for on this model, and it is
 no longer developed. It stays in the repo as it is, so that a stronger local model can be run
 through it unchanged. No runs are planned until one is out.
 
@@ -150,9 +150,9 @@ reachable" into `STATE.md` while a human sat in front of it. pi knows the answer
 not.
 
 **Flag order.** pi hands an unknown flag the next argument as its value when that argument does
-not start with `-`. Extension flags count as unknown there, so `bonsai-pi --localagent "task"`
+not start with `-`. Extension flags count as unknown there, so `qwen-pi --localagent "task"`
 swallows the task. `--` ends option parsing and makes the rest the prompt:
-`bonsai-pi --localagent -- "task"`, with or without `-p`.
+`qwen-pi --localagent -- "task"`, with or without `-p`.
 
 Verified against a scripted stand-in endpoint that plays orchestrator and implementer: without
 the flag no `dispatch` and no skill; with it the orchestrator prompt and the skill are in the
@@ -349,7 +349,7 @@ gitignored and kept on that machine.
 | CLI, workflow, 15-turn limit | stopped, 2 of 3 units | 1:00 | 105 | 106k |
 | CLI, workflow, with revert | stopped, 2 of 5 units | 0:49 | 96 | 77k |
 | **CLI, workflow, tests decide** | **works, no `BLOCKED`, e2e `PASS`, README** | **0:34** | 61 | 55k |
-| Tron, `bonsai-pi` alone (T-002) | a working game with tests | 1:30 | 108 | 118k |
+| Tron, `qwen-pi` alone (T-002) | a working game with tests | 1:30 | 108 | 118k |
 | Tron, workflow, attempt 1 | stopped: the revert broke `node_modules` | 0:34 | 68 | 58k |
 | **Tron, workflow, attempt 2** | **stopped, the game core not finished** | 2:50 | 123 | 225k |
 
@@ -449,5 +449,5 @@ the result for this one.
    a repo, and without one `changed:` describes whatever repo encloses it (T-018's `changed:`
    lines were never about its own work dir).
 2. The first thing to read off is harness change 4, which has not run on a real model.
-3. Compare against `bonsai-pi` alone on the same model, not against the numbers above: the
+3. Compare against `qwen-pi` alone on the same model, not against the numbers above: the
    workflow is worth recommending only if it beats the model working alone on Tron.

@@ -24,7 +24,7 @@ no DOM assertion does.
   the CPU), `--image-max-tokens N` / `--image-min-tokens N` for dynamic-resolution models.
 - **pi**: `"input": ["text", "image"]` per model in `models.json`; its `read` tool then returns an
   image to the model, and `images.autoResize` caps images at 2000x2000 before they are sent.
-- `bonsai-studio` passes `--no-mmproj` today because no profile budgets a projector
+- `qwen-studio` passes `--no-mmproj` today because no profile budgets a projector
   ([agent.md](../docs/agent.md#unsloth-studio)); with this setting it can pass the same file.
 
 ## What
@@ -49,6 +49,6 @@ no DOM assertion does.
 
 ## Done when
 
-`VISION=1 ./install.sh model pi` fetches the projector and writes the image input; `bonsai-server`
-starts with it at the same VRAM; a `bonsai-pi -p` that reads a PNG describes it; the numbers above
+`VISION=1 ./install.sh model pi` fetches the projector and writes the image input; `qwen-server`
+starts with it at the same VRAM; a `qwen-pi -p` that reads a PNG describes it; the numbers above
 are in the model files. Off by default.

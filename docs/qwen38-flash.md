@@ -52,7 +52,7 @@ three 256-token turns at 18.1-18.9 tok/s against 17.8-18.5, the 5k prompt warm a
 **The window.** The indexer's compute buffer is ~13 B x context x ubatch, and that, not the KV
 cache, bounds it. 131k at `q8_0`/`q8_0` and ub 512 is 7 386 MiB. 262k fits with `q4_0`/`q4_0` and ub
 256 (7.56 GB, the same tg, prompts at ~29 tok/s): `CTX=262144 KV_K=q4_0 KV_V=q4_0 UB=256
-bonsai-server`. KV quality at `q4_0` is not measured for this model.
+qwen-server`. KV quality at `q4_0` is not measured for this model.
 
 **Filled, it needs CCCL 3.2** (T-049, 2026-10-03, `runs/T-049-flash-deep/`). Built against
 CUDA 12.9 alone, the server died in both T-046 sessions at ~48k of context, and on a fresh
@@ -73,7 +73,7 @@ it, and would cut the toolkits from apt that the build accepts today. Rebuilt th
 `install.sh build` with the setting, the installed binary gave the same: 110k at 97.4 tok/s, 10.0
 tok/s after it, VRAM flat at 7 594 MiB.
 
-**Measured through `bonsai-server`** (T-039, 2026-09-29, prebuilt b11160, `dedicated`, 50 GB WSL2;
+**Measured through `qwen-server`** (T-039, 2026-09-29, prebuilt b11160, `dedicated`, 50 GB WSL2;
 native Linux in [its own section](#native-linux-every-expert-cached)):
 
 | Threads | tg, 256-token turns (2 x 3) | pp, 5 064-token prompt | a chat turn with thinking |

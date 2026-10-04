@@ -47,6 +47,6 @@ path, kept in case the decision is revisited.
    tree. Either way `build` must stop applying a patch the tree already contains
    (`git apply --check` before applying, or a stamp).
 3. README: a "stock llama.cpp / Ollama / LM Studio" paragraph for people who only want the
-   server; `bonsai-pi` and the profiles are what remains of this repo's value.
+   server; `qwen-pi` and the profiles are what remains of this repo's value.
 
 Not in scope: the dedicated PTQ1_0 mat-vec kernel (ceiling ~22 tok/s on the RX 570).

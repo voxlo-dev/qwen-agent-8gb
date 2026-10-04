@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: MIT
 # Checks everything that would make a later step fail, before any of them spends half an hour:
-# disk, RAM, the GPU driver for BACKEND, VRAM, the distro and Node. Reports every item, then
+# disk, RAM and which model it allows, the GPU driver for BACKEND, VRAM, the distro and Node. Reports every item, then
 # exits once. install.sh runs it first; SKIP_PREFLIGHT=1 turns it off. Takes the step list as
 # arguments so it only checks what is about to run.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -58,13 +58,13 @@ hf_model="${HF_HOME:-$HOME/.cache/huggingface}/hub/models--${MODEL_REPO//\//--}/
 runs model && [[ ! -f "$MODEL_PATH" && ! -f "$hf_model" ]] && need_home=$((need_home + MODEL_DISK_MB))
 runs pi    && need_home=$((need_home + 500))
 if ((need_home > 0)); then
-  have="$(free_mb "$BONSAI_HOME")"
+  have="$(free_mb "$QWEN_HOME")"
   if [[ -z "$have" ]]; then
-    soft "disk: cannot read free space for $BONSAI_HOME"
+    soft "disk: cannot read free space for $QWEN_HOME"
   elif ((have < need_home)); then
-    hard "disk: $((have / 1024)) GB free at $BONSAI_HOME, needs ~$((need_home / 1024)) GB"
+    hard "disk: $((have / 1024)) GB free at $QWEN_HOME, needs ~$((need_home / 1024)) GB"
   else
-    pass "disk: $((have / 1024)) GB free at $BONSAI_HOME, needs ~$((need_home / 1024)) GB"
+    pass "disk: $((have / 1024)) GB free at $QWEN_HOME, needs ~$((need_home / 1024)) GB"
   fi
 fi
 if runs deps && [[ "$BACKEND" == cuda ]] && ! has nvcc; then
@@ -84,7 +84,7 @@ if [[ -z "$avail_mb" || -z "$total_mb" ]]; then
 elif ((MODEL_RAM_MB > 0)); then
   # A MoE keeps its experts in RAM for as long as it serves, so the ceiling is MemTotal: under
   # WSL2 that is half the Windows RAM unless .wslconfig says otherwise. See docs/qwen36.md.
-  need_ram=$((MODEL_RAM_MB + 2000))
+  need_ram="$(ram_needed_mb "$MODEL")"
   wslhint=""; grep -qi microsoft /proc/version 2>/dev/null \
     && wslhint=" - WSL2 sees half the Windows RAM by default: raise memory= in %UserProfile%\\.wslconfig, then wsl --shutdown"
   if ((total_mb < need_ram)); then
@@ -105,6 +105,12 @@ elif ((avail_mb < 7500)); then
   soft "RAM: ${avail_mb} MB available - the model loads through mmap and peaks at 5.8 GB; the build falls back to fewer jobs"
 else
   pass "RAM: ${avail_mb} MB available"
+fi
+# The ramp: which of the models this machine's RAM allows, and the one to take (README.md#which-model).
+if [[ -n "$total_mb" ]]; then
+  fits=""; for m in $(ramp_models); do model_fits "$m" "$total_mb" && fits+="${fits:+, }$m"; done
+  rec="$(recommended_model "$total_mb")"
+  pass "models: $((total_mb / 1024)) GB of RAM runs ${fits:-none}${rec:+; recommended here: $rec}; this run: $MODEL"
 fi
 
 # --- GPU --------------------------------------------------------------------
@@ -216,7 +222,7 @@ fi
 # --- port -------------------------------------------------------------------
 if [[ "$SERVER_HOST" == 127.0.0.1 || "$SERVER_HOST" == localhost ]]; then
   if curl -sf --max-time 2 "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then
-    soft "port $PORT: something already answers there - if it is not bonsai-server, set PORT and re-run ./install.sh pi"
+    soft "port $PORT: something already answers there - if it is not qwen-server, set PORT and re-run ./install.sh pi"
   fi
 fi
 

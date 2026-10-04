@@ -34,5 +34,5 @@ stays `medium`; the doc names the difference.
 
 ## Done when
 
-`./install.sh model pi` twice (second run: "model present"), `bonsai-server` serves
+`./install.sh model pi` twice (second run: "model present"), `qwen-server` serves
 `Swift-Bonsai-2-PTQ1_0.gguf` under `bonsai-27b`, `/props` shows the template unchanged.

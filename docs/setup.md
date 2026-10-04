@@ -12,7 +12,7 @@ native Linux since 2026-09-29.
 - **`CMAKE_CUDA_ARCHITECTURES`** comes from `nvidia-smi` (`89` for Ada). Compiling for one architecture is much faster than for the default set.
 - **`GGML_CUDA_CUB_3DOT2=ON`**, Unsloth's tree on CUDA only (`LLAMA_CMAKE_ARGS` in the Qwen model files): cmake fetches CCCL v3.2.0 from NVIDIA's GitHub at configure time, so that build needs github.com, and the toolkit's own CCCL (2.8 in 12.9) is not used. Without it Qwen3.8-Flash's sparse attention runs the CUDA pool out of the card at 19-48k of context ([qwen38-flash.md](qwen38-flash.md), T-049). Any toolkit >= 12.4 works with it; CUDA 13 is not needed.
 - **ccache** speeds up rebuilds and is used when present; the build works without it.
-- OpenSSL is not needed: it only enables HTTPS model downloads inside llama-server, and `bonsai-server` passes a local path.
+- OpenSSL is not needed: it only enables HTTPS model downloads inside llama-server, and `qwen-server` passes a local path.
 - **Vulkan** (`BACKEND=vulkan`): `GGML_VULKAN=ON` and the patches from `patches/vulkan/` applied to
   the clean checkout, nothing else. There is no architecture to pick; the shaders are compiled by
   `glslc` at build time (`vulkan-shaders-gen`) and the driver specialises them. The Vulkan flash
@@ -60,7 +60,7 @@ T-005, T-006):
 24.04 ships 18.19, Debian 13 20.19. nvm is the tested source (v24.21 on Mint 22.3); it reaches
 only shells that read `~/.bashrc`, so a distro Node left in `/usr/bin` still wins elsewhere, and
 preflight says which one it found. NodeSource works the same way through apt. pi takes 440 MB in
-`$BONSAI_HOME/pi`.
+`$QWEN_HOME/pi`.
 
 Disk, measured: model 5.6 GB, `llama.cpp` checkout and build 1.3-1.9 GB, ccache ~0.25 GB, pi
 0.44 GB. The toolkit: ~5.4 GB from apt, 7.3 GB for NVIDIA's `cuda-toolkit-12-9`, whose Nsight
@@ -130,7 +130,7 @@ to be rewritten are the parts that are hard:
   branch, and the ccache launchers with it, mean something else.
 - **`model` symlinks out of the Hugging Face cache**, which needs developer mode or an
   administrator.
-- **`bonsai-pi` is the real cost.** `setsid`, `flock`, `kill -0`, pruning sessions by pid, and the
+- **`qwen-pi` is the real cost.** `setsid`, `flock`, `kill -0`, pruning sessions by pid, and the
   HUP/TERM/QUIT traps that make [Server lifecycle](agent.md#server-lifecycle) work have no Windows
   counterpart. It would be reinvented with job objects and a mutex - the one piece of this repo
   where the failure modes were expensive to find, rebuilt on a platform where they would have to be
@@ -207,7 +207,7 @@ throughout, which is why guest-wide usage peaked at 15.1 GB while the build itse
 
 `install.sh` runs [`scripts/preflight.sh`](../scripts/preflight.sh) before any step. It exists
 because the two expensive steps come first and fail last: a CUDA build is 10 to 30 minutes and the
-model is 5.6 GB, so a missing driver, a full disk or a 6 GB card used to be discovered after half
+model 5.6 to 88 GB, so a missing driver, a full disk or a 6 GB card used to be discovered after half
 an hour of work rather than before it.
 
 It checks the distro (a derivative by its base, from `ID_LIKE` and `UBUNTU_CODENAME`), free disk
@@ -229,6 +229,14 @@ on `PORT`. Three properties matter:
 `SKIP_PREFLIGHT=1` bypasses it. The failure message says so, because the checks encode what was
 true on three machines and should not be the thing that stops a fourth.
 
+It also says which models the machine's RAM runs and which one it recommends: `MemTotal` against
+each model file's `MODEL_RAM_MB` plus ~2 GB, the same gate the selected model is held to, and
+Qwen3.6 as the recommendation wherever it fits (Qwen3.8-Flash is never recommended, only chosen).
+Before preflight, a first `./install.sh` without `MODEL` shows the same list as a numbered question
+and records the answer in `$QWEN_HOME/model.env` ([README](../README.md#install-in-detail)). Both
+read the model files with `model_var` in `scripts/lib.sh`, so a new model file joins the list by
+its `MODEL_RAM_MB`, `MODEL_TITLE` and `MODEL_ROLE`.
+
 VRAM in use above 400 MiB is a warning rather than a failure: it usually means a desktop is on the
 card, which is what `PROFILE=display` is for, but it can equally be another model server that will
 be gone by the time this one starts. See [VRAM budget](bonsai.md#vram-budget).
@@ -237,20 +245,20 @@ be gone by the time this one starts. See [VRAM budget](bonsai.md#vram-budget).
 
 | Symptom | Cause · fix |
 | --- | --- |
-| `invalid ggml type 143` | Stock llama.cpp is running. Start through `bonsai-server`. |
+| `invalid ggml type 143` | Stock llama.cpp is running. Start through `qwen-server`. |
 | Generation slows sharply as context grows, GPU load low | Mixed K/V cache types on a build without `FA_ALL_QUANTS`: `FORCE=1 ./install.sh build` |
 | `offloaded N/65 layers` with N < 65 | `--fit` is active or VRAM is taken. Check `nvidia-smi` and move the display to the iGPU. |
 | Slower while a browser is visible | The browser renders on the RTX. Switch it to the iGPU in Windows graphics settings. |
 | `sudo: a terminal is required` | Run `./install.sh deps` in a real terminal, not through an agent's shell. |
 | `pi -p` hangs in scripts | pi waits on stdin without a TTY: add `< /dev/null`. |
-| `pi` talks to another model, or ignores the budget | Plain `pi` is your global instance. Start `bonsai-pi`. |
-| `bonsai-server exited during start` | Read `$BONSAI_HOME/server.log`; usually VRAM taken by another process, see `nvidia-smi`. |
-| `no bonsai-server with model ... on port` | Something else listens on `PORT`. Stop it or set another `PORT`, then `./install.sh pi`. |
+| `pi` talks to another model, or ignores the budget | Plain `pi` is your global instance. Start `qwen-pi`. |
+| `qwen-server exited during start` | Read `$QWEN_HOME/server.log`; usually VRAM taken by another process, see `nvidia-smi`. |
+| `no qwen-server with model ... on port` | Something else listens on `PORT`. Stop it or set another `PORT`, then `./install.sh pi`. |
 | Answer ends after exactly `MAX_TOKENS` | The output cap was hit. Raise `MAX_TOKENS` or lower `BUDGET`. |
 | `stopReason: length` well below `MAX_TOKENS`, near a compaction | pi's output clamp: `BUDGET` too large for `RESERVE_TOKENS - 4096`. See [Context budget](agent.md#context-budget). |
 | pi compacts every turn, most of the time goes into summarizing | `RESERVE_TOKENS`/`KEEP_RECENT_TOKENS` are unset or too large for `CTX`: `./install.sh pi`. See [Context budget](agent.md#context-budget). |
 | Vulkan: ~1.2x below the numbers here, GTT above 400 MiB at 16k | Mesa < 25.2: `RADV_PERFTEST=nogttspill` is ignored. `deps` warns; take `mesa-vulkan-drivers` from backports. See [Other GPU backends](bonsai.md#other-gpu-backends). |
-| Vulkan, Qwen: the first request fast, every later one on the same cache ~2x slower, GTT grows | `GGML_VK_DISABLE_HOST_VISIBLE_VIDMEM` is unset, e.g. a server started by hand rather than through `bonsai-server`. See [qwen36.md](qwen36.md#on-the-rx-570-vulkan). |
+| Vulkan, Qwen: the first request fast, every later one on the same cache ~2x slower, GTT grows | `GGML_VK_DISABLE_HOST_VISIBLE_VIDMEM` is unset, e.g. a server started by hand rather than through `qwen-server`. See [qwen36.md](qwen36.md#on-the-rx-570-vulkan). |
 | Vulkan: VRAM reads a few MiB right after load | Normal. RADV moves the weights into VRAM on the first request. Judge by tok/s, and read VRAM and GTT together. |
 | Vulkan: ~2x slower, VRAM ~20 MiB, GTT ~6 GB | `GGML_VK_PREFER_HOST_MEMORY` is set. It is checked for presence, so `=0` also turns it on: unset it. |
 | `vulkaninfo` lists no device, `deps` dies on it | Your user is not in the `render` group: `usermod -aG render $USER`, log in again. |

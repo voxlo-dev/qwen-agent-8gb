@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: MIT
-# Starts the model MODEL names (Ternary-Bonsai-2-27B by default) on the llama.cpp tree its model
-# file pins, with the settings from config.env, the profile and models/$MODEL.env. The flags they
-# turn into are in scripts/server-flags.sh, shared with bin/bonsai-studio.
+# Starts the model MODEL names (by default the one ./install.sh recorded, else Qwen3.6-35B-A3B) on
+# the llama.cpp tree its model file pins, with the settings from config.env, the profile and models/$MODEL.env. The flags they
+# turn into are in scripts/server-flags.sh, shared with bin/qwen-studio.
 # Extra arguments go straight to llama-server and override the defaults. Rationale: docs/dev.md.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"

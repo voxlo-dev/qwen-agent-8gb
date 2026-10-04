@@ -4,7 +4,7 @@
 - **Category:** spike
 - **Importance:** high
 - **Effort:** M (the task set and runner first; then a day of runs per comparison)
-- **Depends on:** none. Feeds T-044's README, which names a recommended model
+- **Depends on:** none. Feeds the README's recommendation (Qwen3.6 since T-044, on n = 1 sessions). Absorbs T-035 (item 6)
 
 ## Why
 
@@ -35,6 +35,11 @@ To decide before building it:
    Apache-2.0 with attribution). Also on Qwen3.6, which the template is written for.
 5. **Harness as a variable**: pi as shipped against OpenCode (and the localagent workflow?) on the
    same server, so "the harness matters more" becomes a number.
+
+6. **The study's own harness** (was T-035, closed 2026-10-04): the study's prompt and follow-up in
+   OpenCode, as its table ran ([model-comparison.md](../docs/model-comparison.md)), so a model of
+   this repo lands in that table. T-035 planned it for Bonsai, twice; with Qwen3.6 the default it
+   belongs here, as one harness of item 5, for whichever models the task set keeps.
 
 Open: whether an existing benchmark harness (SWE-bench-style, terminal-bench, Aider's) fits better
 than a home-made set; how long a full run may take on one machine.

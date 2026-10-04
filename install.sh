@@ -1,21 +1,59 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: MIT
 # Runs the install steps in order, or only the ones named: deps build model pi link
-# scripts/preflight.sh runs first and stops before any step spends time; SKIP_PREFLIGHT=1 skips it.
+# Without MODEL, asks once which model to install, from the RAM next to the card, and writes the
+# answer to $QWEN_HOME/model.env, which the qwen-* commands read; not on a terminal it takes the
+# default. scripts/preflight.sh runs next and stops before any step spends time; SKIP_PREFLIGHT=1
+# skips it.
 source "$(dirname "${BASH_SOURCE[0]}")/scripts/lib.sh"
 
+# The bonsai-* links of an install from before the rename point at files that are gone.
 link() {
   mkdir -p "$HOME/.local/bin"
-  for b in bonsai-server bonsai-pi bonsai-studio; do ln -sf "$ROOT/bin/$b" "$HOME/.local/bin/$b"; done
-  log "linked bonsai-server, bonsai-pi and bonsai-studio into ~/.local/bin"
+  local b
+  for b in bonsai-server bonsai-pi bonsai-studio; do
+    [[ -L "$HOME/.local/bin/$b" && ! -e "$HOME/.local/bin/$b" ]] && rm -f "$HOME/.local/bin/$b" \
+      && log "removed the old link ~/.local/bin/$b"
+  done
+  for b in qwen-server qwen-pi qwen-studio; do ln -sf "$ROOT/bin/$b" "$HOME/.local/bin/$b"; done
+  log "linked qwen-server, qwen-pi and qwen-studio into ~/.local/bin"
   [[ ":$PATH:" == *":$HOME/.local/bin:"* ]] || warn "~/.local/bin is not on PATH"
 }
 
+# The model: MODEL from the environment, else the one model.env records, else asked here. The first
+# answer, or the first MODEL installed, becomes what the qwen-* commands run without MODEL;
+# installing a second model later leaves it. Changing it: edit model.env, or delete it and run
+# ./install.sh again. See README.md#which-model.
+choose_model() {
+  local total rec answer m n; total="$(mem_total_mb)"; rec="$(recommended_model "${total:-0}")"
+  [[ -n "$rec" ]] || rec="$MODEL_DEFAULT"
+  # The list and the question go to the terminal; only the answer is the function's output.
+  { log "which model? Chosen by the RAM next to the 8 GB card: ${total:+$((total / 1024)) GB here}"
+    print_ramp "${total:-0}"; } >&2
+  read -r -p "   model (number or name) [$rec]: " answer </dev/tty || answer=""
+  answer="${answer:-$rec}"
+  n=0
+  for m in $(ramp_models); do n=$((n + 1)); [[ "$answer" == "$n" ]] && answer="$m"; done
+  [[ -f "$ROOT/models/$answer.env" ]] || die "no model '$answer' - one of: $(ramp_models | tr '\n' ' ')"
+  echo "$answer"
+}
 steps=("$@")
 ((${#steps[@]})) || steps=(deps build model pi link)
 for s in "${steps[@]}"; do
   case "$s" in deps|build|model|pi|link) ;; *) die "unknown step '$s' (deps build model pi link)" ;; esac
 done
+
+model_file="$QWEN_HOME/model.env"
+if [[ "$MODEL_FROM" != file && ! -f "$model_file" ]]; then
+  chosen="$MODEL"
+  if [[ "$MODEL_FROM" == default && -t 0 && -t 1 ]]; then chosen="$(choose_model)"; fi
+  mkdir -p "$QWEN_HOME"
+  printf '# Written by install.sh: the model the qwen-* commands run when MODEL is not set.\nMODEL=%s\n' \
+    "$chosen" > "$model_file"
+  log "default model: $chosen, recorded in $model_file"
+  # config.env has already resolved everything for the default; a different answer starts over.
+  [[ "$chosen" == "$MODEL" ]] || exec bash "$ROOT/install.sh" "$@"
+fi
 
 # Names the step that failed instead of leaving the last command's message alone on the screen.
 current=""
@@ -48,4 +86,6 @@ for s in "${steps[@]}"; do
   esac
 done
 current=""
-log "done - start the server with: bonsai-server, then bonsai-pi in another terminal"
+run=qwen-pi
+[[ "$(sed -n 's/^MODEL=//p' "$model_file" 2>/dev/null)" == "$MODEL" ]] || run="MODEL=$MODEL qwen-pi"
+log "done - start the agent in a project directory with: $run (it starts qwen-server itself)"

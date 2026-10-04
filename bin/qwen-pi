@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: MIT
-# Starts the pinned pi with its own config in PI_AGENT_DIR, set up for bonsai-server.
+# Starts the pinned pi with its own config in PI_AGENT_DIR, set up for qwen-server.
 # A global pi and ~/.pi are not used. Arguments go straight to pi.
-# With SERVER_AUTOSTART, starts bonsai-server in the background when none is running and stops it
-# once the last bonsai-pi session ends - only for a server on this machine; a remote SERVER_HOST
+# With SERVER_AUTOSTART, starts qwen-server in the background when none is running and stops it
+# once the last qwen-pi session ends - only for a server on this machine; a remote SERVER_HOST
 # is expected to be serving already. Rationale: docs/agent.md#server-lifecycle.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
@@ -46,9 +46,9 @@ case "$SERVER_HOST" in
     ;;
 esac
 
-# Sessions register under run/, guarded by a lock, so a second bonsai-pi shares the server and
-# only the last one to leave stops it. server.pid exists only for a server bonsai-pi started.
-run="$BONSAI_HOME/run"
+# Sessions register under run/, guarded by a lock, so a second qwen-pi shares the server and
+# only the last one to leave stops it. server.pid exists only for a server qwen-pi started.
+run="$QWEN_HOME/run"
 mkdir -p "$run/sessions"
 exec 9>"$run/lock"
 
@@ -62,7 +62,7 @@ cleanup() {
   prune
   local pid; pid="$(cat "$run/server.pid" 2>/dev/null || true)"
   if [[ -z "$(ls -A "$run/sessions")" ]] && alive "$pid"; then
-    say "stopping bonsai-server"
+    say "stopping qwen-server"
     kill "$pid"
     for _ in {1..20}; do alive "$pid" || break; sleep 0.5; done
     alive "$pid" && kill -9 "$pid"
@@ -84,10 +84,10 @@ if [[ "$autostart" == "true" ]]; then
   # is adopted here: its pid stays in server.pid, so this session stops it when it leaves.
   pid="$(cat "$run/server.pid" 2>/dev/null || true)"
   if ! healthy && ! alive "$pid"; then
-    say "starting bonsai-server in the background, log: $SERVER_LOG"
+    say "starting qwen-server in the background, log: $SERVER_LOG"
     # Own session: Ctrl+C in pi must not reach the server, and closing the terminal is
     # handled by the HUP trap above instead of killing it behind our back.
-    setsid "$ROOT/bin/bonsai-server" >"$SERVER_LOG" 2>&1 </dev/null 9>&- &
+    setsid "$ROOT/bin/qwen-server" >"$SERVER_LOG" 2>&1 </dev/null 9>&- &
     pid=$!
     echo "$pid" > "$run/server.pid"
   fi
@@ -97,12 +97,12 @@ if [[ "$autostart" == "true" ]]; then
     say "waiting for the model to load"
     for ((i = 0; i < SERVER_START_TIMEOUT; i++)); do
       healthy && { say "server ready after ${i}s, starting pi"; break; }
-      alive "$pid" || die_with_log "bonsai-server exited during start"
+      alive "$pid" || die_with_log "qwen-server exited during start"
       # The model takes a while; say so once instead of leaving a silent terminal.
       ((i == 30)) && say "still loading (${CTX} token window on $BACKEND); the timeout is ${SERVER_START_TIMEOUT}s"
       sleep 1
     done
-    healthy || die_with_log "bonsai-server not ready after ${SERVER_START_TIMEOUT}s - raise SERVER_START_TIMEOUT if the model is on a slow disk"
+    healthy || die_with_log "qwen-server not ready after ${SERVER_START_TIMEOUT}s - raise SERVER_START_TIMEOUT if the model is on a slow disk"
   fi
 fi
 
@@ -112,7 +112,7 @@ models="$(curl -sf --max-time 2 "$url/v1/models" || true)"
 if ! grep -q "\"$MODEL_ALIAS\"" <<<"$models"; then
   served="$(grep -o '"id" *: *"[^"]*"' <<<"$models" | head -1 | sed 's/.*"\([^"]*\)"$/\1/' || true)"
   [[ -n "$served" ]] && die "the server at $url serves $served, not $MODEL_ALIAS (MODEL=$MODEL) - stop it, or give one of them another PORT"
-  die "no bonsai-server with model $MODEL_ALIAS at $url - start bonsai-server, or set SERVER_AUTOSTART=true"
+  die "no qwen-server with model $MODEL_ALIAS at $url - start qwen-server, or set SERVER_AUTOSTART=true"
 fi
 
 # pi handles Ctrl+C itself. Uncaught, SIGINT would also end this script without its EXIT trap;
@@ -121,6 +121,6 @@ trap : INT
 status=0
 # The extensions read their limits from the environment, so config.env stays the source.
 export LOCALAGENT_MAX_TURNS="$AGENT_MAX_TURNS" LOCALAGENT_AGENT_MODEL="local/$AGENT_MODEL_ID"
-export BONSAI_TOOL_TIMEOUT="$TOOL_TIMEOUT"
+export QWEN_TOOL_TIMEOUT="$TOOL_TIMEOUT"
 PI_CODING_AGENT_DIR="$PI_AGENT_DIR" "$PI_BIN" "$@" 9>&- || status=$?
 exit "$status"

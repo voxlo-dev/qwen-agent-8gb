@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Logs beat descriptions. `$BONSAI_HOME` is `~/.local/share/bonsai-local` unless you moved it.
+        Logs beat descriptions. `$QWEN_HOME` is `~/.local/share/qwen-local` unless you moved it (`bonsai-local` for an install from before the rename).
   - type: dropdown
     id: step
     attributes:
@@ -16,10 +16,18 @@ body:
         - install.sh model
         - install.sh pi
         - install.sh link
-        - bonsai-server (starting or running)
-        - bonsai-pi (the agent session)
-        - bonsai-pi --localagent (the frozen workflow, not recommended)
+        - qwen-server (starting or running)
+        - qwen-pi (the agent session)
+        - qwen-pi --localagent (the frozen workflow, not recommended)
         - something else
+    validations:
+      required: true
+  - type: dropdown
+    id: model
+    attributes:
+      label: Model
+      description: "`MODEL`, or the one `./install.sh` chose (`cat $QWEN_HOME/model.env`)."
+      options: [qwen36-35b, qwen38-flash, bonsai]
     validations:
       required: true
   - type: dropdown
@@ -63,7 +71,7 @@ body:
     attributes:
       label: Log
       description: |
-        The last 30 lines of the failing step. For a server problem that is `tail -30 ~/.local/share/bonsai-local/server.log`.
+        The last 30 lines of the failing step. For a server problem that is `tail -30 $QWEN_HOME/server.log`.
       render: shell
     validations:
       required: true

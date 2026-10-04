@@ -37,7 +37,7 @@ tokens from a 48000 window. With `--no-context-shift` the server stops there; th
 
 The settings below keep the post-compaction state comfortably under the trigger and the
 worst case inside the window. `install.sh pi` writes the two compaction keys into
-`$BONSAI_HOME/pi-agent/settings.json`.
+`$QWEN_HOME/pi-agent/settings.json`.
 
 Because these five constrain each other, they live in a profile, `profiles/$MODEL/$PROFILE.env`, and move together.
 `PROFILE=dedicated` (default) is the 64k window below. `PROFILE=display` is the 48k set the
@@ -102,7 +102,7 @@ would be cut off, so the tool-call allowance above is a typical case, not a boun
 
 ## The agent prompt
 
-`$BONSAI_HOME/pi-agent/AGENTS.md`, installed from [`pi/pi-agents.md`](../pi/pi-agents.md), goes
+`$QWEN_HOME/pi-agent/AGENTS.md`, installed from [`pi/pi-agents.md`](../pi/pi-agents.md), goes
 into pi's system prompt at startup, for every session and both models; `--append-system-prompt`
 and `--system-prompt` are the per-run equivalents. It is written as a description of the
 situation with the reason for each point, not as rules, and that is a measured choice:
@@ -138,9 +138,9 @@ next point it carries, with a new reading after.
 
 ## pi
 
-`bonsai-pi` runs a private pi: `install.sh pi` puts version `PI_VERSION` into `$BONSAI_HOME/pi`
+`qwen-pi` runs a private pi: `install.sh pi` puts version `PI_VERSION` into `$QWEN_HOME/pi`
 (`npm install --prefix`, no `-g`, no sudo), and the wrapper sets `PI_CODING_AGENT_DIR` to
-`$BONSAI_HOME/pi-agent`. pi resolves every user path through that variable (`getAgentDir()`
+`$QWEN_HOME/pi-agent`. pi resolves every user path through that variable (`getAgentDir()`
 in `dist/config.js`): providers, settings, `AGENTS.md`, auth, sessions.
 
 The first version wrote into the global `~/.pi/agent` instead, and collided with any pi
@@ -173,27 +173,27 @@ The `tool-timeout` extension (`pi/extensions/tool-timeout/`, installed by `insta
 every bash call that has no `timeout` the one in `TOOL_TIMEOUT`, 300 seconds by default; the
 model's own value is left alone. pi then kills the process tree and returns `Command timed out
 after 300 seconds` as a tool error, which the model reads like any other result and the session
-goes on. `bonsai-pi` passes the value in the environment, so changing it needs no `install.sh pi`;
+goes on. `qwen-pi` passes the value in the environment, so changing it needs no `install.sh pi`;
 `TOOL_TIMEOUT=0` turns it off. The agent prompt says so in one line, so a step that needs longer
 can ask for it. Not yet seen in a session: the value is from the timings above, not from a run
 with it.
 
 ## Server lifecycle
 
-`bonsai-pi` owns the server only when it started it. On start it checks `/health` on `PORT`;
-with no answer it launches `bonsai-server` in the background and waits until `/health`
+`qwen-pi` owns the server only when it started it. On start it checks `/health` on `PORT`;
+with no answer it launches `qwen-server` in the background and waits until `/health`
 returns 200 (the model is loaded), at most `SERVER_START_TIMEOUT` seconds. Every run then
 checks `/v1/models` for `MODEL_ALIAS`, so pi never talks to some other server on that port.
 
-- **Shared server.** Each session registers its PID in `$BONSAI_HOME/run/sessions/` under a
+- **Shared server.** Each session registers its PID in `$QWEN_HOME/run/sessions/` under a
   `flock`. The last session to leave stops the server; sessions that died without cleaning
-  up are pruned by PID. `run/server.pid` exists only for a server `bonsai-pi` started, so a
+  up are pruned by PID. `run/server.pid` exists only for a server `qwen-pi` started, so a
   server started by hand is never stopped.
 - **Own session (`setsid`).** The server runs outside the terminal's process group: Ctrl+C
   in pi - which cancels a generation - must not reach llama-server, which installs its own
   SIGINT handler and would quit.
 - **Orphans.** A session killed with SIGKILL, or a terminal window closed hard, runs no trap:
-  its server stays up with its pid still in `run/server.pid`. The next `bonsai-pi` prunes the
+  its server stays up with its pid still in `run/server.pid`. The next `qwen-pi` prunes the
   dead session entries and adopts that server, so it stops when that session leaves. Verified.
 - **Traps.** Closing the terminal (HUP), TERM or QUIT runs the cleanup. While pi runs, the wrapper
   catches SIGINT with a no-op: uncaught, bash would die with pi when pi exits on SIGINT and skip
@@ -204,7 +204,7 @@ pi, pi killed by SIGINT, Ctrl+C during load, HUP, a hand-started server, and a s
 dies during start. With the real model:
 
 - The first session waits for the load: `model loaded` after 7.7-7.9 s, the same with the
-  model file evicted from the page cache (`posix_fadvise DONTNEED`). A one-line `bonsai-pi -p`
+  model file evicted from the page cache (`posix_fadvise DONTNEED`). A one-line `qwen-pi -p`
   takes 14 s end to end. `SERVER_START_TIMEOUT` 300 has ample margin on this machine.
 - llama-server exits on SIGTERM within ~1 s, and VRAM goes from 7 275 MiB back to 0.
 - Two overlapping sessions share one server; the last to end stops it.
@@ -214,17 +214,17 @@ dies during start. With the real model:
 
 ### A server on another machine
 
-`LISTEN_HOST` is what llama-server binds to, `SERVER_HOST` what the client side - `bonsai-pi`'s
+`LISTEN_HOST` is what llama-server binds to, `SERVER_HOST` what the client side - `qwen-pi`'s
 health and model checks, and the `baseUrl` written into pi's `models.json` - connects to. Both
 default to `127.0.0.1`, which is the whole setup on one machine. They were the same hardcoded
 literal until it turned out that the machine with the GPU and the machine you work on need not
 be the same one.
 
-To serve one GPU box to another host: `LISTEN_HOST=0.0.0.0 bonsai-server` there, then
-`SERVER_HOST=<box> ./install.sh pi` here and `bonsai-pi` as usual. `./install.sh pi` has to run
+To serve one GPU box to another host: `LISTEN_HOST=0.0.0.0 qwen-server` there, then
+`SERVER_HOST=<box> ./install.sh pi` here and `qwen-pi` as usual. `./install.sh pi` has to run
 again because pi keeps a written copy of the URL - the same drift as `CTX` and `PORT`.
 
-- **Autostart steps aside.** `bonsai-pi` starts and stops a server by pid and reads `SERVER_LOG`;
+- **Autostart steps aside.** `qwen-pi` starts and stops a server by pid and reads `SERVER_LOG`;
   neither exists for someone else's process on another host. With a non-local `SERVER_HOST` it
   therefore never starts one, says so once, and fails on the `/v1/models` check if nothing is
   serving. `SERVER_AUTOSTART` keeps its meaning for a local server.
@@ -241,14 +241,14 @@ against a real remote server - the machine this was written on has no GPU.
 
 ## Unsloth Studio
 
-`bonsai-studio` opens the model `MODEL` names in [Unsloth Studio](https://github.com/unslothai/unsloth)
+`qwen-studio` opens the model `MODEL` names in [Unsloth Studio](https://github.com/unslothai/unsloth)
 instead of a bare llama-server: Studio's chat UI and API, this repo's build and flags. It is
 `unsloth studio run` with three things changed.
 
 - **The build.** `LLAMA_SERVER_PATH` points Studio at `LLAMA_SERVER`, the tree the model file
   pins. That is the first place Studio looks, ahead of its own `~/.unsloth/llama.cpp`, so Bonsai
   runs on the fork and both Qwen models on the Unsloth tree this repo built, at the pinned source.
-- **The flags.** `scripts/server-flags.sh` holds what `bonsai-server` passes, and `bonsai-studio`
+- **The flags.** `scripts/server-flags.sh` holds what `qwen-server` passes, and `qwen-studio`
   hands the same list to Studio, which appends it after its own flags: llama.cpp's last value
   wins, so the profile's placement, cache types, reasoning budget and `SERVER_ARGS` are what runs.
   The window goes as `--context-length`, MTP as `--speculative-type mtp` or `off`, one slot as
@@ -261,25 +261,25 @@ instead of a bare llama-server: Studio's chat UI and API, this repo's build and 
 
 Two details of Studio's parser decide how the flags are written. Its **manual** memory mode
 strips every offload flag from the pass-through and has no command line option for the expert
-count, so `bonsai-studio` stays in **auto**, which keeps an explicitly requested window ("no
+count, so `qwen-studio` stays in **auto**, which keeps an explicitly requested window ("no
 silent shrink") and passes the flags through untouched. And its command line reads a short
 cluster as its own options: `-ctxcp 4` ends in `-p`, its port. `server-flags.sh` and the model
 files therefore use long spellings only (`--n-gpu-layers`, `--ctx-checkpoints`, ...), and so must
-extra arguments to `bonsai-studio`.
+extra arguments to `qwen-studio`.
 
 Studio adds flags of its own that are left alone: `--metrics`, `--slot-save-path` (it saves a
 slot's KV cache to disk when it unloads an idle model), `--chat-template-kwargs` with the same
 `preserve_thinking: false` as `PRESERVE_THINKING`, `--video-fps`, and for Bonsai
 `--ctx-checkpoints 21` against llama.cpp's 32, sized from host RAM. It also sends a system prompt and
 tool definitions of its own, ~1.3k tokens on a one-line question. Its port is 8888, it has its own
-login and API keys, and `bonsai-pi` does not talk to it: pi stays on `bonsai-server`.
+login and API keys, and `qwen-pi` does not talk to it: pi stays on `qwen-server`.
 
 **One model per start.** `LLAMA_SERVER_PATH` holds for the whole Studio process, so a model picked
-in Studio's model list afterwards runs on the tree of the `MODEL` `bonsai-studio` was started
+in Studio's model list afterwards runs on the tree of the `MODEL` `qwen-studio` was started
 with, under Studio's own flags (window 8192, none of the profile). Seen on 2026-10-04: started as
 Bonsai, Qwen3.6 then loaded on Bonsai's fork at 45.5 tok/s, and Qwen3.8-Flash failed with
 `unknown model architecture: 'qwen4exp'`, which only Unsloth's tree knows. Another model means
-quitting Studio and `MODEL=… bonsai-studio`.
+quitting Studio and `MODEL=… qwen-studio`.
 
 Verified on 2026-10-02 with Studio 2026.9.12 (`unsloth` package), headless and without the GPU,
 which the agent sandbox does not have: for all three models Studio started our build with every
@@ -288,21 +288,21 @@ Qwen3.8-Flash answered a chat request through its API on the CPU (21 tok/s with 
 55 %, and 6.2); Bonsai's ternary weights read a prompt on the CPU too slowly to wait for.
 
 **On the card Studio costs nothing** (T-043, 2026-10-04, headless, from the user's shell, each
-model started with its own `MODEL`): VRAM and decode speed equal those of `bonsai-server`.
+model started with its own `MODEL`): VRAM and decode speed equal those of `qwen-server`.
 
-| Model | VRAM under Studio | `bonsai-server` | tg under Studio | `bonsai-server` |
+| Model | VRAM under Studio | `qwen-server` | tg under Studio | `qwen-server` |
 | --- | --- | --- | --- | --- |
 | Bonsai, 64k | 7 748 MiB loaded, 7 758 after an answer | 7 747 / 7 758 | 36.1 tok/s | 36.6 |
 | Qwen3.6, 131k, MTP | 7 260 MiB | 7 278 | 62.8 | 52-65 |
 | Qwen3.8-Flash, 131k | 7 580 MiB | 7 566 | 17.0 | 18.6-18.9 warm |
 
 Flash's 17.0 tok/s (and 27 tok/s on the prompt) was a first pass right after another model, with
-experts still coming from the SSD: the level of a cold pass under `bonsai-server` (17.8). Studio's
+experts still coming from the SSD: the level of a cold pass under `qwen-server` (17.8). Studio's
 extra flags and its ~1.3k-token system prompt leave Bonsai's 441 MiB of margin where it was.
 
 ## localagent workflow
 
-`bonsai-pi --localagent` runs a multi-agent build pipeline for this model. **Decided
+`qwen-pi --localagent` runs a multi-agent build pipeline for this model. **Decided
 2026-09-23: frozen and not recommended.** On a small CLI it finished in the time the model takes
 alone; on the study's Tron prompt it was stopped after 2:50 with its first unit unfinished, where
 the model alone built the game in 1:30. What stopped it was the model - compactions inside a

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
 # The llama-server flags of the model and profile config.env selected, for the two launchers that
-# start one: bin/bonsai-server directly, bin/bonsai-studio through Unsloth Studio. Sourced after
+# start one: bin/qwen-server directly, bin/qwen-studio through Unsloth Studio. Sourced after
 # config.env. Exports the environment the server needs, and sets LOAD_FLAGS (placement, cache,
 # reasoning, the model file's SERVER_ARGS) and the sampling defaults. The model path, the window,
 # where it listens, the slot count and the drafting stay with each launcher, because Studio takes

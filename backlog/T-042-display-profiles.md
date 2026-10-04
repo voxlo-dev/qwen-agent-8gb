@@ -34,5 +34,5 @@ With a normal desktop on the card (browser and editor open, `nvidia-smi` reading
    in RAM (~470 MiB for Qwen3.6) or a smaller window, and the comment says which.
 3. The rule a user can apply without measuring: free VRAM before start against each profile's
    buffers, written next to the profiles in [context-window.md](../docs/context-window.md). Whether
-   `bonsai-server` should pick the profile from free VRAM itself is the question that table
+   `qwen-server` should pick the profile from free VRAM itself is the question that table
    answers; preflight already warns when a display is on the card.

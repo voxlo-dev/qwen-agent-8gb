@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: MIT
 # Opens the model MODEL names in Unsloth Studio, on this repo's llama.cpp build and with the flags
-# bonsai-server uses (scripts/server-flags.sh): `unsloth studio run` with LLAMA_SERVER_PATH set to
+# qwen-server uses (scripts/server-flags.sh): `unsloth studio run` with LLAMA_SERVER_PATH set to
 # LLAMA_SERVER, the window and drafting as Studio options, the rest passed through to its
 # llama-server, where they win over the values Studio picks itself. Studio's chat UI and API then
 # serve the measured setup. Needs Unsloth Studio installed (UNSLOTH_CLI). Extra arguments go to
@@ -23,7 +23,7 @@ cli="$UNSLOTH_CLI"
 [[ -x "$LLAMA_SERVER" ]] || $print || die "llama-server not found at $LLAMA_SERVER - run MODEL=$MODEL ./install.sh build"
 [[ -f "$MODEL_PATH" ]] || $print || die "model not found at $MODEL_PATH - run MODEL=$MODEL ./install.sh model"
 
-# Studio drafts on its own when it finds an MTP head; bonsai-server's SPEC_TYPE decides instead.
+# Studio drafts on its own when it finds an MTP head; qwen-server's SPEC_TYPE decides instead.
 case "$SPEC_TYPE" in
   draft-mtp) spec=mtp ;;
   "" | none) spec=off ;;
@@ -33,7 +33,7 @@ esac
 # Studio's default memory mode, auto, keeps an explicitly requested window and appends the flags
 # below after its own, so the profile's placement wins (--fit off, every layer on the card, the
 # experts of CPU_MOE layers in RAM). Its manual mode would strip them and has no option for the
-# expert count. One slot as in bonsai-server: Studio's default of 4 splits CTX. The sampling
+# expert count. One slot as in qwen-server: Studio's default of 4 splits CTX. The sampling
 # options pin the values over what the UI or a request would send.
 args=(studio run --model "$MODEL_PATH" --context-length "$CTX"
   --parallel 1 --speculative-type "$spec"

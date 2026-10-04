@@ -1,11 +1,12 @@
 # Qwen3.6-35B-A3B
 
-`MODEL=qwen36-35b` serves Qwen3.6-35B-A3B instead of Bonsai. It is a mixture-of-experts model with
-35B parameters, 3B of them active per token. The experts live in system RAM; the card holds
-attention, the shared expert, the KV cache and the MTP head. **Supported** since T-041
-(2026-10-02): measured for speed and KV quality, and in two agent sessions, the second of which
-built the study's game in 9 minutes and tested it end to end in a browser in another 9
-([agent-sessions.md](agent-sessions.md#b2-qwen36)). Bonsai is still the default.
+`MODEL=qwen36-35b`, **the default** since T-044 (2026-10-04), and the model `install.sh` recommends
+from 32 GB of RAM. It is a mixture-of-experts model with 35B parameters, 3B of them active per
+token. The experts live in system RAM; the card holds attention, the shared expert, the KV cache
+and the MTP head. Measured for speed and KV quality, and in two agent sessions, the second of
+which built the study's game in 9 minutes and tested it end to end in a browser in another 9
+([agent-sessions.md](agent-sessions.md#b2-qwen36)), where Bonsai's sessions of the same day ran past
+90 minutes without a working game. That decided the default.
 
 It is also the slot for Qwen 4. If a Qwen 4 35B-A3B ships, it becomes a model file of its own plus
 one re-run of the measurement below. The code does not change.
@@ -27,8 +28,8 @@ tokens at `q8_0`/`q8_0`, against Bonsai's 34.
 | --- | --- |
 | Model | `unsloth/Qwen3.6-35B-A3B-MTP-GGUF` rev `5bc3e238d916f48a861bac2f8a1990a0e9b7e98d`, `Qwen3.6-35B-A3B-UD-Q4_K_M.gguf`, 22 663 387 424 bytes |
 | sha256 | `0b21525e972670ed59e1812e170b27c26355381f0656ecc4e25617ece7dac58b` |
-| llama.cpp, CUDA | Unsloth's b11160, source `a3c12db9dfc9a5bdf93df199ec370e9faf117c69` from its release tarball, in `$BONSAI_HOME/llama.cpp-unsloth`, shared with Qwen3.8-Flash ([why](#one-tree-for-both-qwen-models)) |
-| llama.cpp, Vulkan | mainline, ggml-org `8212c7802455255460ab8e18fc34754560031b34` (2026-09-24), in `$BONSAI_HOME/llama.cpp-mainline`; everything below was measured on it |
+| llama.cpp, CUDA | Unsloth's b11160, source `a3c12db9dfc9a5bdf93df199ec370e9faf117c69` from its release tarball, in `$QWEN_HOME/llama.cpp-unsloth`, shared with Qwen3.8-Flash ([why](#one-tree-for-both-qwen-models)) |
+| llama.cpp, Vulkan | mainline, ggml-org `8212c7802455255460ab8e18fc34754560031b34` (2026-09-24), in `$QWEN_HOME/llama.cpp-mainline`; everything below was measured on it |
 
 The `-MTP-` repo carries the same weights as `unsloth/Qwen3.6-35B-A3B-GGUF` plus one MTP layer
 (`blk.40.nextn.*`), which the fork ignores and mainline drafts with. Not
@@ -187,12 +188,12 @@ scripts and logs in `runs/T-036-qwen-vulkan-repeat/`:
   drop; without checkpoints there is no drop, but no prefix reuse either.
 - **The fix.** `GGML_VK_DISABLE_HOST_VISIBLE_VIDMEM=1` allocates device-local only, and writes go
   through a staging copy. Prefix reuse stays intact (`prompt_n` 4 on each repeat), nothing moves,
-  and at 131k the repeat is **2.3x** faster. `bonsai-server` sets it for every `vulkan` run:
+  and at 131k the repeat is **2.3x** faster. `qwen-server` sets it for every `vulkan` run:
   Bonsai measures the same with it (143.81 vs 144.07 ms/token and 53.5 vs 53.7 tok/s on the
   847-token prompt at 64k), since it has no recurrent state to checkpoint. On a card with
   Resizable BAR, all of VRAM is CPU-visible, so this problem should not occur there. It is not
   measured.
-- **Through `bonsai-server`**, with the profile below and normal sampling: 21.5, 20.3 and 20.2 tok/s
+- **Through `qwen-server`**, with the profile below and normal sampling: 21.5, 20.3 and 20.2 tok/s
   at 131k, VRAM and GTT unchanged across the three requests.
 
 **Where a token's time goes.** One generated token at 25k depth, 32k window, no MTP, 62 ms: 35 ms
@@ -211,7 +212,7 @@ follows.** The knobs tried around it:
   compete with the thread that drives the GPU. A 256-token turn without MTP: `-t 8` 17.2 and
   17.1, `-t 7` 18.9 and 19.0, `-t 6` 19.0 and 17.9, `-t 5` 19.4, `-t 4` 18.8. Not a default: it is
   this VM's, and on the 4060 Ti machine under native Linux it reverses
-  ([Native Linux](#native-linux)). On this box, pass it by hand: `bonsai-server -t 7`.
+  ([Native Linux](#native-linux)). On this box, pass it by hand: `qwen-server -t 7`.
 - **`--load-mode none`**, which llama.cpp suggests for experts in RAM, loses the Vulkan device while
   loading (`ErrorDeviceLost`) on this card. It stays on mmap.
 
@@ -258,12 +259,12 @@ accepted the same tokens; default and `-t 7` twice, interleaved (`runs/T-037-nat
 Every thread fewer costs, and the repeats agree to 0.1 tok/s. For Qwen3.8-Flash `-t 7` and the
 default are within noise (two interleaved pairs, each won once). The ~6 % `-t 7` gained under WSL2
 and the ~10 % on the RX 570's VM are properties of a VM's vCPUs, not of the model, so there is no
-`THREADS` setting: on such a box, pass `-t` to `bonsai-server` by hand.
+`THREADS` setting: on such a box, pass `-t` to `qwen-server` by hand.
 
 ## One tree for both Qwen models
 
 Since T-038 Qwen3.6 runs on Unsloth's tree too, on CUDA: one build for both MoE models, the one
-Unsloth Studio ships, so `bonsai-studio` and `bonsai-server` run the same code. Measured against
+Unsloth Studio ships, so `qwen-studio` and `qwen-server` run the same code. Measured against
 mainline `8212c78` on 2026-10-02, native Linux, the shipped profile (131k, `CPU_MOE` 38, `UB` 2048,
 MTP), three 256-token turns at temperature 0 and one 41.7k-token prompt with 123 tokens after it:
 

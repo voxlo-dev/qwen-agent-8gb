@@ -1,7 +1,8 @@
 # Agent sessions
 
-The evidence for which model does what: the study's Tron prompt in a plain `bonsai-pi` session,
-one row per session, every model on the same protocol. Per-model settings are in
+The evidence for which model does what: the study's Tron prompt in a plain `qwen-pi` session,
+one row per session, every model on the same protocol (`qwen-pi` was `bonsai-pi` until
+2026-10-04; the same command under its old name). Per-model settings are in
 [bonsai.md](bonsai.md), [qwen36.md](qwen36.md) and [qwen38-flash.md](qwen38-flash.md); the pi
 budget these sessions run under in [agent.md](agent.md#context-budget).
 
@@ -38,7 +39,7 @@ row at temperature 1.0: a reading, not a ranking.
 **96k, tried on 2026-09-26/27** (T-035's behaviour day). The window from
 [context-window.md](context-window.md#bonsai-windows-on-8-gb), `CTX` 96000 at `q4_0`/`q4_0` with
 `KEEP_RECENT_TOKENS` 16000 and the rest as `dedicated`, against the shipped 64k as the control. The
-Tron prompt, plain `bonsai-pi`, fresh directories; the 96k session ran a day before the control.
+Tron prompt, plain `qwen-pi`, fresh directories; the 96k session ran a day before the control.
 Logs and `evaluate.sh`: `runs/T-035-bonsai-measured/day/` on the 4060 Ti machine.
 
 | | 96k, `q4_0`/`q4_0` | 64k, shipped |
@@ -69,7 +70,7 @@ one here. That is what n = 1 at temperature 1.0 is worth.
 ### B: Qwen3.6
 
 T-035's behaviour day, 2026-09-27, on the 4060 Ti with the `dedicated` profile as shipped: the
-study's Tron prompt in a plain `bonsai-pi` session, next to two Bonsai sessions on the same prompt
+study's Tron prompt in a plain `qwen-pi` session, next to two Bonsai sessions on the same prompt
 ([above](#a-and-c-bonsai-96k-against-64k)). Logs: `runs/T-035-bonsai-measured/day/` on that machine.
 
 | | |
@@ -95,7 +96,7 @@ implementations in its thinking when nothing stops it ([bonsai.md](bonsai.md#rea
 ### D: Qwen3.8-Flash
 
 Session D of T-035's behaviour day, 2026-09-29, under WSL2 (50 GB, so ~10 tok/s with the SSD in
-the loop), `dedicated` as shipped plus `-t 7`: the study's Tron prompt in a plain `bonsai-pi`
+the loop), `dedicated` as shipped plus `-t 7`: the study's Tron prompt in a plain `qwen-pi`
 session, the same protocol as [Qwen3.6's](#b-qwen36). The session file stayed in the
 WSL2 distribution; the numbers are from the server log, `runs/T-035-bonsai-measured/day/server-D.log`.
 
