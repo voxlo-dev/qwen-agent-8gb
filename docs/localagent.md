@@ -17,7 +17,7 @@ the bill** - see [Economics](#economics). On this model the bill was never paid 
 
 This file is the workflow's home: the shape, the measured runs, why each piece is what it is, and
 why it is not recommended. The window and compaction numbers it runs inside are in
-[`dev.md`](dev.md#context-budget).
+[`agent.md`](agent.md#context-budget).
 
 ## Status
 
@@ -108,7 +108,7 @@ That was before T-019 folded the skill's 164 lines into a 79-line orchestrator p
   flags. The orchestrator keeps `BUDGET`. Why: inside a dispatched child no user message follows
   the brief, so the template keeps every earlier turn's thinking in the prompt (the
   `preserve_thinking` switch only drops thinking *before* the last user message, see
-  [dev.md](dev.md#thinking-in-the-prompt)). At 8192 a child crossed pi's 48k compaction trigger
+  [bonsai.md](bonsai.md#thinking-in-the-prompt)). At 8192 a child crossed pi's 48k compaction trigger
   in five or six turns, every time - the Tron numbers below.
 - **A runaway dispatch is cut off after `AGENT_MAX_TURNS` (30)** and comes back as a `BLOCKED`
   tool error naming the log, with its files left in place for the next attempt, even when the
@@ -136,7 +136,7 @@ That was before T-019 folded the skill's 164 lines into a 79-line orchestrator p
   does not fill the orchestrator's window. A reply without one comes back as
   `NO STATUS: <its last lines>`, with the test verdict. **Only that line comes back**, which is
   why an agent with something to say writes a file and names it. A child that ends on anything
-  but `stop` - `length` included, see [Context budget](dev.md#context-budget) - or exits non-zero
+  but `stop` - `length` included, see [Context budget](agent.md#context-budget) - or exits non-zero
   comes back as a tool error, which the workflow treats as `BLOCKED`.
 - Its session goes to `sessions/{cwd-slug}/dispatch/{orchestrator-session-id}/`, beside the
   orchestrator's own log. That JSONL is written live, so a second terminal can follow what an

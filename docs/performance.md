@@ -65,7 +65,7 @@ rest are Gated DeltaNet with a fixed-size recurrent state that does not grow wit
 
 So per token: 16 × 4 × 256 = 16,384 elements each for K and V. At `q8_0` (8.5 bit) and `q4_0`
 (4.5 bit) that is 17,408 + 9,216 = **26,624 bytes per token**, or 25.4 MiB per 1k - the 26 MiB
-in [VRAM budget](dev.md#vram-budget).
+in [VRAM budget](bonsai.md#vram-budget).
 
 ### The long-context gap
 
@@ -142,7 +142,7 @@ rare in practice.
 **Temperature is not a speed knob.** Baseline 35.92 at `temp 1.0` vs 35.89 at 0.7 - identical
 within noise. Acceptance does not improve reliably either (6→11 % in one config, 10→7 % in
 another). The jump to 100 % only appears near `temp 0`, which this model must not run at; see
-[Sampling](dev.md#sampling).
+[Sampling](bonsai.md#sampling).
 
 Caveat for anyone revisiting this: the replay reconstructs prompts up to ~3.1k tokens, while the
 real session reached 18k. More context means more material for n-gram matching, so the effect
@@ -154,7 +154,7 @@ reopened.
 
 Multi-token prediction is a different mechanism from n-gram speculation: a trained head drafts
 from the model's own hidden state. On Qwen3.6-35B-A3B it adds 33-54 % on natural output
-([qwen.md](qwen.md#what-it-decides)). For Bonsai it is not available as shipped. The official GGUF
+([qwen36.md](qwen36.md#what-it-decides)). For Bonsai it is not available as shipped. The official GGUF
 has no MTP block (its tensors end at `blk.63`). The only head is a community one,
 `ProCreations/Ternary-Bonsai-2-27B-MTP`, trained against the PQ2_0 packing and shipped inside a
 7.66 GB PQ2_0 bundle that does not fit on 8 GB. Using it would take a merged PTQ1_0 file and a fork
@@ -200,7 +200,7 @@ The other honest answer is that **the setting with the largest effect on wall-cl
 speed setting at all**. A compaction costs a summarization call plus a full prompt reprocess of
 ~33k tokens, and prompt processing runs at 340-450 tok/s. Keeping the context budget right is
 worth more minutes than any decode tuning discussed here - see
-[Context budget](dev.md#context-budget).
+[Context budget](agent.md#context-budget).
 
 ## Reproducing
 

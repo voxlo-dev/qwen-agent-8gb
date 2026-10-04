@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: MIT
 # Installs the pinned pi into PI_PREFIX and writes its config into PI_AGENT_DIR: provider "local"
-# as the default model, the compaction budget, AGENTS.md, the localagent extension with its workflow.
+# as the default model, the compaction budget, AGENTS.md, the tool-timeout extension, and the
+# localagent extension with its workflow.
 # A global pi and ~/.pi stay untouched.
 # Re-run after changing CTX, SERVER_HOST, PORT, MAX_TOKENS, RESERVE_TOKENS or KEEP_RECENT_TOKENS.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -72,7 +73,7 @@ settings = load("settings.json")
 settings.update(defaultProvider="local", defaultModel=os.environ["ALIAS"])
 # pi's defaults (reserve 16384, keepRecent 20000) assume a 200k window. At 48k they leave
 # ~8k of working room and the post-compaction context stays above the trigger, so pi
-# compacts on every turn. See docs/dev.md#context-budget.
+# compacts on every turn. See docs/agent.md#context-budget.
 settings.setdefault("compaction", {}).update(
     reserveTokens=int(os.environ["RESERVE_TOKENS"]),
     keepRecentTokens=int(os.environ["KEEP_RECENT_TOKENS"]),
@@ -90,3 +91,9 @@ mkdir -p "$ext"
 cp "$ROOT"/pi/extensions/localagent/*.ts "$ext/"
 cp -r "$ROOT/pi/localagent-workflow" "$ext/workflow"
 log "wrote the localagent extension to $ext"
+
+ext="$dir/extensions/tool-timeout"
+rm -rf "$ext"
+mkdir -p "$ext"
+cp "$ROOT"/pi/extensions/tool-timeout/*.ts "$ext/"
+log "wrote the tool-timeout extension to $ext"

@@ -6,7 +6,7 @@
 # llama-server, where they win over the values Studio picks itself. Studio's chat UI and API then
 # serve the measured setup. Needs Unsloth Studio installed (UNSLOTH_CLI). Extra arguments go to
 # `unsloth studio run` (e.g. --port, --api-only); --print shows the command instead of running it.
-# Rationale: docs/dev.md#unsloth-studio.
+# Rationale: docs/agent.md#unsloth-studio.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
 source "$ROOT/config.env"

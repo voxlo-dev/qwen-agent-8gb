@@ -7,14 +7,14 @@ One maintainer, evenings and weekends. Expect a slow but real reply.
 **A non-default choice arrives with the measurement that justifies it.**
 
 This repo is short. Five bash scripts, a config file and two launchers. Its actual product is the
-set of reasons in [`docs/dev.md`](docs/dev.md): why the KV cache is `q8_0`/`q4_0`, why `--fit` is
+set of reasons in `docs/` ([`docs/dev.md`](docs/dev.md) says which file holds what): why the KV cache is `q8_0`/`q4_0`, why `--fit` is
 off, why the thinking budget is 8192, why the context window is 64k and not 80k. Every one of those
 answers a failure that was observed and measured on real hardware.
 
 A pull request that changes a flag without saying what it does to tok/s, VRAM or the context budget
 cannot be reviewed, because there is nothing to review it against. So:
 
-- A new or changed setting comes with a `docs/dev.md` entry and the number behind it.
+- A new or changed setting comes with an entry in the `docs/` file for its topic, and the number behind it.
 - Say what you measured it on: card, backend, driver version, distro, context size.
 - A change that makes something faster states the before and after from the same machine in the
   same session.
@@ -56,7 +56,7 @@ context budget was measured against one specific version of pi's compaction code
 
 Moving one means re-testing: the model loads, generation speed is unchanged, `patches/` still
 applies (`build` refuses when it does not), and for `PI_VERSION`, that the compaction behaviour in
-[`docs/dev.md#context-budget`](docs/dev.md#context-budget) still holds. Say in the PR which of those
+[`docs/agent.md#context-budget`](docs/agent.md#context-budget) still holds. Say in the PR which of those
 you checked.
 
 ## The three things most worth sending
@@ -79,7 +79,7 @@ you checked.
 - A native Windows port. WSL2 is the Windows path and the reference platform for every CUDA
   number here; a PowerShell second implementation of the install and of the server lifecycle is
   more than one person can keep measured. The reasoning is in
-  [`docs/dev.md#windows`](docs/dev.md#windows).
+  [`docs/setup.md#windows`](docs/setup.md#windows).
 - Installing anything into `~/.pi` or as a global npm package.
 
 ## Code of conduct

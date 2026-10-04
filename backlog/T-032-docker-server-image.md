@@ -9,7 +9,7 @@
 ## Why
 
 `deps.sh` is apt. Where apt's CUDA is too old (Ubuntu 24.04, 22.04, Debian 13) it now stops at
-once and points to NVIDIA's repository ([Toolchain](../docs/dev.md#toolchain)), which is four
+once and points to NVIDIA's repository ([Toolchain](../docs/setup.md#toolchain)), which is four
 commands and a pin on the host; every system beyond Debian and Ubuntu still brings its own
 toolchain by hand. A container moves that one problem - and only that one - off the
 host. The driver still has to be on the host, the card still needs 8 GB, and the profile
@@ -18,8 +18,8 @@ arithmetic does not change.
 **The cut is what makes this small.** The split already exists in `config.env`: `LISTEN_HOST` is
 what the server binds to, `SERVER_HOST` what pi connects to, and `bin/bonsai-pi` steps aside from
 autostart as soon as `SERVER_HOST` is not this machine (see
-[Server lifecycle](../docs/dev.md#server-lifecycle) and
-[A server on another machine](../docs/dev.md#a-server-on-another-machine)). A container is that
+[Server lifecycle](../docs/agent.md#server-lifecycle) and
+[A server on another machine](../docs/agent.md#a-server-on-another-machine)). A container is that
 case with a shorter network path. Everything in `bonsai-pi` that is hard - `setsid`, the `flock`
 on `run/lock`, session pids, adopting an orphaned server - is not reimplemented, it is not needed:
 the container runtime is the process manager.
@@ -37,7 +37,7 @@ There is nothing for a container to isolate.
    `OFF`, and that is a flag change, so it needs a number: what does it cost in tok/s on the
    reference machine?
 2. **Vulkan in a container** carries its own Mesa, independent of the host's. That is the
-   `RADV_PERFTEST=nogttspill` trap from [Other GPU backends](../docs/dev.md#other-gpu-backends)
+   `RADV_PERFTEST=nogttspill` trap from [Other GPU backends](../docs/bonsai.md#other-gpu-backends)
    with one more place to get the version wrong. CUDA is routine by comparison (NVIDIA Container
    Toolkit, WSL2 included).
 3. **The GGUF stays out of the image.** 5.6 GB, and redistribution is not ours to decide. It is a
@@ -71,7 +71,7 @@ There is nothing for a container to isolate.
 - `docker build` for `cuda` on the reference machine, `vulkan` on the box; `curl /props` through
   the published port returns the same values the host server returns.
 - Generation and an ~850-token prompt at the same window as
-  [Other GPU backends](../docs/dev.md#other-gpu-backends), containerised against host, same
+  [Other GPU backends](../docs/bonsai.md#other-gpu-backends), containerised against host, same
   session. A gap beyond noise is a finding, not a rounding error.
 - `GGML_NATIVE=OFF` measured separately on the same machine, before and after.
 - A `bonsai-pi` session against the container: one turn, and the session JSONL shows the usual

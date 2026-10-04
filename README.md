@@ -67,7 +67,7 @@ bonsai-pi            # terminal 2
 
 `bonsai-pi` is a separate pi instance, so a pi you use with other models keeps its own settings. The server is also a plain OpenAI-compatible endpoint at `http://127.0.0.1:8080/v1`, model `bonsai-27b`.
 
-If you use [Unsloth Studio](https://github.com/unslothai/unsloth), `bonsai-studio` opens the same model in it, on this repo's build and with the same window, placement and reasoning flags, instead of the values Studio would pick itself. Studio serves its chat UI and an API with its own key at `http://127.0.0.1:8888`; arguments go to `unsloth studio run` (for example `--port`), and `--print` shows the command. Details: [docs/dev.md](docs/dev.md#unsloth-studio).
+If you use [Unsloth Studio](https://github.com/unslothai/unsloth), `bonsai-studio` opens the same model in it, on this repo's build and with the same window, placement and reasoning flags, instead of the values Studio would pick itself. Studio serves its chat UI and an API with its own key at `http://127.0.0.1:8888`; arguments go to `unsloth studio run` (for example `--port`), and `--print` shows the command. Details: [docs/agent.md](docs/agent.md#unsloth-studio).
 
 `bonsai-pi --localagent` starts a highly experimental multi-agent workflow that is **not recommended** yet and performs worse, we're working on it: [docs/localagent.md](docs/localagent.md#status).
 
@@ -111,7 +111,7 @@ with 441 MiB of headroom on one driver.
 | --- | --- |
 | NVIDIA | RTX 20xx to 40xx with 8 GB or more. RTX 50xx needs CUDA >= 12.8, untested ([T-020](backlog/T-020-supported-hardware.md)) |
 | AMD | RDNA2 and RDNA3 through Vulkan, which should be considerably faster than the RX 570 |
-| More than 8 GB | works, but wastes the window; raise `CTX` yourself, see [Context budget](docs/dev.md#context-budget) |
+| More than 8 GB | works, but wastes the window; raise `CTX` yourself, see [Context budget](docs/agent.md#context-budget) |
 
 If you run one of these, a [hardware report](../../issues/new?template=hardware-report.yml) is the
 most useful thing you can send.
@@ -119,13 +119,13 @@ most useful thing you can send.
 **Not supported:** less than 8 GB of VRAM, partial offload (it costs this architecture about 10x
 decode speed), ROCm/HIP, Metal, and CPU-only. Vulkan is the one AMD path.
 
-[Toolchain](docs/dev.md#toolchain) says what is known beyond that, [Other GPU backends](docs/dev.md#other-gpu-backends) where the Vulkan numbers come from.
+[Toolchain](docs/setup.md#toolchain) says what is known beyond that, [Other GPU backends](docs/bonsai.md#other-gpu-backends) where the Vulkan numbers come from.
 
-- Linux, native or WSL2. CUDA: a working NVIDIA driver (`nvidia-smi` runs; under WSL2 it is installed on the Windows side; natively with Secure Boot on, its module key must be enrolled, see [Secure Boot](docs/dev.md#secure-boot)). Vulkan: the `amdgpu` kernel driver and **Mesa >= 25.2** (Debian 13 ships 25.0.7; take `mesa-vulkan-drivers` from `trixie-backports`), and your user in the `render` group
-- A GPU with 8 GB VRAM, of which ~7.3 GB must be **free**: the GPU should drive no display, see [VRAM budget](docs/dev.md#vram-budget). Less does not work, the model does not run partially offloaded at usable speed
-- CUDA: toolkit >= 12.4 with a host gcc it accepts; >= 12.8 for RTX 50xx. `./install.sh deps` installs it via apt, which yields 12.4 on Ubuntu 26.04 only; on 24.04 and its derivatives (Linux Mint 22) it stops and points to [CUDA from NVIDIA's repository](docs/dev.md#cuda-from-nvidias-repository), four commands, after which `./install.sh` runs through. Vulkan: `glslc`, the Vulkan headers and loader; `deps` installs them on Debian and Ubuntu
+- Linux, native or WSL2. CUDA: a working NVIDIA driver (`nvidia-smi` runs; under WSL2 it is installed on the Windows side; natively with Secure Boot on, its module key must be enrolled, see [Secure Boot](docs/setup.md#secure-boot)). Vulkan: the `amdgpu` kernel driver and **Mesa >= 25.2** (Debian 13 ships 25.0.7; take `mesa-vulkan-drivers` from `trixie-backports`), and your user in the `render` group
+- A GPU with 8 GB VRAM, of which ~7.3 GB must be **free**: the GPU should drive no display, see [VRAM budget](docs/bonsai.md#vram-budget). Less does not work, the model does not run partially offloaded at usable speed
+- CUDA: toolkit >= 12.4 with a host gcc it accepts; >= 12.8 for RTX 50xx. `./install.sh deps` installs it via apt, which yields 12.4 on Ubuntu 26.04 only; on 24.04 and its derivatives (Linux Mint 22) it stops and points to [CUDA from NVIDIA's repository](docs/setup.md#cuda-from-nvidias-repository), four commands, after which `./install.sh` runs through. Vulkan: `glslc`, the Vulkan headers and loader; `deps` installs them on Debian and Ubuntu
 - Node.js >= 22.19 for pi: apt has it on Ubuntu 26.04 only (24.04 ships 18, Debian 13 20), elsewhere take it from [nvm](https://github.com/nvm-sh/nvm) or NodeSource
-- **8 GB RAM** to serve: the model is read through `mmap`, so llama-server peaks at 5.8 GB while loading and then sits below 700 MB, with the rest as reclaimable page cache. Building wants more headroom - a single Vulkan shader unit peaks at 4.4 GB - so `build` caps its parallelism at ~2 GB per job instead of `-j $(nproc)`; `BUILD_JOBS` overrides it. See [RAM and build memory](docs/dev.md#ram-and-build-memory)
+- **8 GB RAM** to serve: the model is read through `mmap`, so llama-server peaks at 5.8 GB while loading and then sits below 700 MB, with the rest as reclaimable page cache. Building wants more headroom - a single Vulkan shader unit peaks at 4.4 GB - so `build` caps its parallelism at ~2 GB per job instead of `-j $(nproc)`; `BUILD_JOBS` overrides it. See [RAM and build memory](docs/setup.md#ram-and-build-memory)
 - ~14 GB free disk: 5.6 GB model, 1.9 GB build, ~5.4 GB for the CUDA toolkit from apt (7.3 GB for NVIDIA's 12.9). ~9 GB when a CUDA toolkit is already installed, or with Vulkan
 
 Without apt, install the toolchain yourself (CUDA and gcc, or glslc and the Vulkan SDK; plus cmake, git, python3) and skip `deps`: `./install.sh build model pi link`.
@@ -175,7 +175,7 @@ AMD cards under WSL2 are untested. Use native Linux for the Vulkan backend.
 There is no native Windows install and there will not be one: the reference machine for the
 CUDA numbers is WSL2, and a second PowerShell implementation of the install and the server
 lifecycle is not maintainable next to it. The reasoning is in
-[`docs/dev.md#windows`](docs/dev.md#windows).
+[`docs/setup.md#windows`](docs/setup.md#windows).
 
 ## Configure
 
@@ -191,7 +191,7 @@ PROFILE=display ./install.sh pi     # pi's copy of the values
 PROFILE=display bonsai-pi           # and every run after
 ```
 
-Both are in [`profiles/bonsai/`](profiles/bonsai/); the values inside constrain each other, see [Context budget](docs/dev.md#context-budget). Everything else lives in [`config.env`](config.env). A variable set in the environment wins over both, and extra arguments go straight to llama-server:
+Both are in [`profiles/bonsai/`](profiles/bonsai/); the values inside constrain each other, see [Context budget](docs/agent.md#context-budget). Everything else lives in [`config.env`](config.env). A variable set in the environment wins over both, and extra arguments go straight to llama-server:
 
 ```bash
 CTX=32000 bonsai-server
@@ -201,32 +201,33 @@ bonsai-server --port 9000
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `MODEL` | `bonsai` | `bonsai`, `qwen36-35b` or `qwen38-flash`, see [A second model](#a-second-model-experimental) |
+| `MODEL` | `bonsai` | `bonsai`, `qwen36-35b` or `qwen38-flash`, see [A second model](#a-second-model) |
 | `BACKEND` | `cuda` | `cuda` or `vulkan`; read by `deps`, `build` and `bonsai-server`. `build` rebuilds by itself when it changes |
 | `CUDA_ARCH` | the card's | CUDA architecture `build` compiles for, e.g. `89`; set it to build where `nvidia-smi` sees no card |
-| `BUILD_JOBS` | auto | parallel compile jobs; empty derives them from free RAM and core count, see [RAM and build memory](docs/dev.md#ram-and-build-memory) |
+| `BUILD_JOBS` | auto | parallel compile jobs; empty derives them from free RAM and core count, see [RAM and build memory](docs/setup.md#ram-and-build-memory) |
 | `CTX` | `64000` | context window in tokens (profile); the most 8 GB holds at the default cache types. 96k fits with `q4_0`/`q4_0`, see [Context window](docs/context-window.md) |
 | `KV_K` / `KV_V` | `q8_0` / `q4_0` | KV cache types for keys and values; measured against `f16` in [Context window](docs/context-window.md#kv-cache-quality) |
 | `EFFORT` | `medium` | chat-template reasoning effort: `low`, `medium`, `xhigh` |
 | `SPEC_TYPE` | per model | speculative decoding; `draft-mtp` for Qwen3.6. Turn it off with `none`: an empty value falls back to the model's default |
-| `BUDGET` | `8192` (profile) | thinking tokens per turn; at most `RESERVE_TOKENS - 4096 -` a tool call, see [Context budget](docs/dev.md#context-budget) |
+| `BUDGET` | `8192` (profile) | thinking tokens per turn; at most `RESERVE_TOKENS - 4096 -` a tool call, see [Context budget](docs/agent.md#context-budget) |
 | `PRESERVE_THINKING` | `false` | keep earlier turns' thinking in the prompt |
 | `MAX_TOKENS` | `16000` (profile) | pi's output cap per turn |
 | `RESERVE_TOKENS` | `16000` (profile) | window pi holds back for the answer; it compacts above `CTX - RESERVE_TOKENS` |
 | `KEEP_RECENT_TOKENS` | `12000` (profile) | recent history a compaction keeps |
 | `PORT` | `8080` | server port |
 | `LISTEN_HOST` | `127.0.0.1` | address the server binds to; `0.0.0.0` to serve other machines — there is no authentication |
-| `SERVER_HOST` | `127.0.0.1` | address `bonsai-pi` and pi connect to; set it to run the server on [another machine](docs/dev.md#a-server-on-another-machine) |
+| `SERVER_HOST` | `127.0.0.1` | address `bonsai-pi` and pi connect to; set it to run the server on [another machine](docs/agent.md#a-server-on-another-machine) |
 | `PI_VERSION` | `0.85.1` | pi version the context budget was measured with |
 | `SERVER_AUTOSTART` | `true` | let `bonsai-pi` start and stop the server |
 | `SERVER_START_TIMEOUT` | `300` | seconds `bonsai-pi` waits for the model to load |
+| `TOOL_TIMEOUT` | `300` | seconds after which a bash call the model starts without its own timeout is ended; `0` turns it off, see [Tool timeout](docs/agent.md#tool-timeout) |
 | `UNSLOTH_CLI` | Studio's venv | the `unsloth` command `bonsai-studio` runs; falls back to one on `PATH` |
 
 After changing the profile, `CTX`, `SERVER_HOST`, `PORT`, `MAX_TOKENS`, `RESERVE_TOKENS` or `KEEP_RECENT_TOKENS`, run `./install.sh pi` again so pi's config matches the server.
 
-The last three carry each other: pi's own defaults assume a 200k window and make it compact on every single turn at this size. [Context budget](docs/dev.md#context-budget) has the measurements and the constraints between them.
+The last three carry each other: pi's own defaults assume a 200k window and make it compact on every single turn at this size. [Context budget](docs/agent.md#context-budget) has the measurements and the constraints between them.
 
-### A second model (experimental)
+### A second model
 
 `MODEL=qwen36-35b` serves [Qwen3.6-35B-A3B](https://huggingface.co/Qwen/Qwen3.6-35B-A3B) instead,
 a mixture-of-experts model whose experts live in system RAM while the card holds the rest. On the
@@ -234,8 +235,9 @@ same 4060 Ti it runs a 131k window at 39-45 tok/s on natural output under WSL2, 
 prediction, and at 52-65 tok/s on native Linux.
 It needs **~28 GB of RAM** (under WSL2, raise `memory=` in `%UserProfile%\.wslconfig`), 22 GB of
 disk, and a second llama.cpp build next to the fork: Unsloth's, from its pinned source, mainline on Vulkan. On the RX 570 it runs too, at
-2.5-3.5x Bonsai's speed there, ~22 tok/s at 131k. In its one agent session so far it built the
-study's Tron game in 7 minutes, with rematch broken: [docs/qwen.md](docs/qwen.md#in-an-agent-session).
+2.5-3.5x Bonsai's speed there, ~22 tok/s at 131k. In its second agent session it built the study's
+Tron game in 9 minutes and tested it end to end in a browser in another 9, the best agent result
+in this repo so far: [docs/agent-sessions.md](docs/agent-sessions.md#b2-qwen36).
 
 ```bash
 MODEL=qwen36-35b ./install.sh       # its own build, model and pi config
@@ -248,12 +250,12 @@ not touch the other one's settings or sessions.
 `MODEL=qwen38-flash` goes further: [Qwen3.8-Flash-Next](https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF),
 125B, every expert in RAM, a 131k window at **~19 tok/s and prompts at ~100 tok/s on native Linux**
 with a lean desktop, 9-10 and ~36 under WSL2. A side experiment, with one agent session so far
-([how it went](docs/qwen.md#qwen38-flash-in-an-agent-session)). It
+([how it went](docs/agent-sessions.md#d-qwen38-flash)). It
 needs **~48 GB of RAM** to run and **~58 GB available** to keep every expert cached, which a 64 GB
-PC reaches on native Linux with the browser and editors closed ([why](docs/qwen.md#native-linux)),
+PC reaches on native Linux with the browser and editors closed ([why](docs/qwen38-flash.md#native-linux-every-expert-cached)),
 88 GB of disk and an 8 GB card that drives no display. It runs on Unsloth's llama.cpp, which
 `build` compiles from Unsloth's pinned source, since mainline runs out of VRAM on its sparse
-attention. Details in [docs/qwen.md](docs/qwen.md#qwen38-flash-125b-experimental).
+attention. Details in [docs/qwen38-flash.md](docs/qwen38-flash.md).
 
 ## Performance
 
@@ -285,7 +287,7 @@ AMD RX 570 8 GB through Vulkan (RADV, Mesa 26.1.2), same KV types, with the PTQ1
 Five times slower than the 4060 Ti, and eight times on prompts: a 4k-token agent prompt takes
 ~75 s before the first token. That is batch territory - a task handed to `bonsai-pi -p` and left
 alone - and it is why `vulkan` is not the default. The fork's own
-Vulkan kernel did 0.94 tok/s on this card; [Other GPU backends](docs/dev.md#other-gpu-backends)
+Vulkan kernel did 0.94 tok/s on this card; [Other GPU backends](docs/bonsai.md#other-gpu-backends)
 has the way from there to 7.
 
 ### The one change worth more than any flag
@@ -301,10 +303,14 @@ cannot, `PROFILE=display` drops the window to 48k to make room.
 
 | | |
 | --- | --- |
-| [docs/dev.md](docs/dev.md) | why every non-default choice is what it is, with its measurement, plus troubleshooting |
+| [docs/setup.md](docs/setup.md) | build, toolchain and CUDA per distro, Secure Boot, Windows, preflight, troubleshooting |
+| [docs/agent.md](docs/agent.md) | pi, its context budget, the agent prompt, the server lifecycle, Unsloth Studio |
+| [docs/agent-sessions.md](docs/agent-sessions.md) | every agent session on the study's Tron prompt, all models in one table |
+| [docs/bonsai.md](docs/bonsai.md) | Bonsai: format, VRAM, KV cache, reasoning, sampling, Vulkan |
+| [docs/qwen36.md](docs/qwen36.md) | Qwen3.6-35B-A3B with its experts in RAM, and the slot for Qwen 4 |
+| [docs/qwen38-flash.md](docs/qwen38-flash.md) | Qwen3.8-Flash-Next, 125B, every expert in RAM |
 | [docs/performance.md](docs/performance.md) | what limits generation speed, and what was tried and rejected |
 | [docs/context-window.md](docs/context-window.md) | how large a window fits on 8 GB, and what the KV cache types cost in quality, for both models |
-| [docs/qwen.md](docs/qwen.md) | the second model: Qwen3.6-35B-A3B with its experts in RAM, and the slot for Qwen 4 |
 | [docs/model-comparison.md](docs/model-comparison.md) | eight local models as coding agents on 8 GB, measured before this repo existed |
 | [docs/localagent.md](docs/localagent.md) | the multi-agent workflow: frozen, not recommended, and why |
 | [AGENTS.md](AGENTS.md) | where contributors and AI agents start |

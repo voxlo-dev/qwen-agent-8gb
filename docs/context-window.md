@@ -3,7 +3,7 @@
 How large a window fits on an 8 GB card, what the KV cache types cost in quality, and where the
 edge is. Both models were measured the same way, on the same corpus, so their numbers sit in one
 table: Ternary-Bonsai-2-27B on the pinned fork (T-035), and Qwen3.6-35B-A3B with its experts in
-RAM on mainline llama.cpp (T-034, see [qwen.md](qwen.md)). Everything below is from the reference
+RAM on mainline llama.cpp (T-034, see [qwen36.md](qwen36.md)). Everything below is from the reference
 machine: RTX 4060 Ti 8 GB, WSL2 with 30.9 GB RAM, 2026-09-24 to 26. Scripts and logs are in
 `runs/T-034-qwen-moe/` and `runs/T-035-bonsai-measured/`, which are kept but not versioned.
 
@@ -47,7 +47,7 @@ with thinking and code at the shipped sampling. `@43k` is a 42 803-token prompt,
   clean to the end: the prefill in the quality test below read 92 672 tokens at 357 tok/s, and a
   95 000-token prompt read at 354 tok/s (2026-09-26). It is not the default yet: its one agent
   session compacted cleanly at ~80k but failed on something else, see
-  [dev.md](dev.md#context-budget).
+  [agent.md](agent.md#context-budget).
 - **A same-type cache is not faster.** `q8_0`/`q8_0` gains 2.7 % at 43k and nothing at short
   context, for 12k less window. This settles the hypothesis that the mixed-type kernel explains
   the long-context gap (see [performance.md](performance.md#the-long-context-gap)).

@@ -15,6 +15,7 @@ want="$LLAMA_COMMIT $BACKEND $(cat "${patches[@]}" /dev/null | sha256sum | cut -
 # An unpatched CUDA build keeps the old stamp format, so existing installs do not rebuild for nothing.
 [[ "$BACKEND" == cuda && ${#patches[@]} -eq 0 ]] && want="$LLAMA_COMMIT"
 [[ -n "$LLAMA_TARBALL" ]] && want="$want ${LLAMA_TARBALL_SHA256:0:12}"
+[[ -n "$LLAMA_CMAKE_ARGS" ]] && want="$want $LLAMA_CMAKE_ARGS"
 
 stamp="$LLAMA_DIR/build/.bonsai-commit"
 if [[ -z "${FORCE:-}" && -x "$LLAMA_SERVER" && "$(cat "$stamp" 2>/dev/null)" == "$want" ]]; then
@@ -23,8 +24,8 @@ if [[ -z "${FORCE:-}" && -x "$LLAMA_SERVER" && "$(cat "$stamp" 2>/dev/null)" == 
 fi
 
 case "$BACKEND" in
-  cuda)   has nvcc  || die "nvcc not found - run ./install.sh deps, or install CUDA >= 12.4 yourself (docs/dev.md#toolchain)" ;;
-  vulkan) has glslc || die "glslc not found - run ./install.sh deps, or install the Vulkan SDK yourself (docs/dev.md#toolchain)" ;;
+  cuda)   has nvcc  || die "nvcc not found - run ./install.sh deps, or install CUDA >= 12.4 yourself (docs/setup.md#toolchain)" ;;
+  vulkan) has glslc || die "glslc not found - run ./install.sh deps, or install the Vulkan SDK yourself (docs/setup.md#toolchain)" ;;
 esac
 
 mkdir -p "$LLAMA_DIR"
@@ -65,6 +66,7 @@ launchers=()
 has ccache && launchers=(-DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache)
 
 backend_flags=()
+[[ -n "$LLAMA_CMAKE_ARGS" ]] && read -ra backend_flags <<<"$LLAMA_CMAKE_ARGS"
 case "$BACKEND" in
   cuda)
     arch="$CUDA_ARCH"
@@ -74,7 +76,7 @@ case "$BACKEND" in
     # nvcc before 12.8 does not know Blackwell (sm_120, RTX 50xx) and fails mid-build
     nvcc_ver="$(nvcc --version | sed -n 's/.*release \([0-9]*\.[0-9]*\).*/\1/p')"
     if [[ "$arch" =~ ^[0-9]+$ ]] && ((arch >= 100)) && [[ "$(printf '%s\n' 12.8 "$nvcc_ver" | sort -V | head -1)" != 12.8 ]]; then
-      die "GPU arch sm_$arch needs CUDA >= 12.8, found nvcc $nvcc_ver - see docs/dev.md#toolchain"
+      die "GPU arch sm_$arch needs CUDA >= 12.8, found nvcc $nvcc_ver - see docs/setup.md#toolchain"
     fi
 
     has ccache && launchers+=(-DCMAKE_CUDA_COMPILER_LAUNCHER=ccache)
@@ -102,7 +104,7 @@ cmake -B build -S . \
 
 # One Vulkan shader unit (mul_mm.comp.cpp) peaks at 4.4 GB and the whole -j8 build at 5.7 GB,
 # so on a machine with fewer GB than cores x 2 the default -j nproc is what runs it out of
-# memory. Measured in docs/dev.md#ram-and-build-memory.
+# memory. Measured in docs/setup.md#ram-and-build-memory.
 jobs="$BUILD_JOBS"
 if [[ -z "$jobs" ]]; then
   cores="$(nproc)"

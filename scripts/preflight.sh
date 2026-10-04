@@ -46,7 +46,7 @@ fi
 # A model file names the backends it was measured on.
 case " $MODEL_BACKENDS " in
   *" $BACKEND "*) ;;
-  *) hard "model: MODEL=$MODEL is measured on ${MODEL_BACKENDS// /, } only, not $BACKEND - see docs/qwen.md" ;;
+  *) hard "model: MODEL=$MODEL is measured on ${MODEL_BACKENDS// /, } only, not $BACKEND - see docs/qwen36.md" ;;
 esac
 
 # --- disk -------------------------------------------------------------------
@@ -83,7 +83,7 @@ if [[ -z "$avail_mb" || -z "$total_mb" ]]; then
   soft "RAM: cannot read /proc/meminfo"
 elif ((MODEL_RAM_MB > 0)); then
   # A MoE keeps its experts in RAM for as long as it serves, so the ceiling is MemTotal: under
-  # WSL2 that is half the Windows RAM unless .wslconfig says otherwise. See docs/qwen.md.
+  # WSL2 that is half the Windows RAM unless .wslconfig says otherwise. See docs/qwen36.md.
   need_ram=$((MODEL_RAM_MB + 2000))
   wslhint=""; grep -qi microsoft /proc/version 2>/dev/null \
     && wslhint=" - WSL2 sees half the Windows RAM by default: raise memory= in %UserProfile%\\.wslconfig, then wsl --shutdown"
@@ -94,13 +94,13 @@ elif ((MODEL_RAM_MB > 0)); then
     soft "RAM: ${avail_mb} of ${total_mb} MB available, $MODEL holds ~${MODEL_RAM_MB} MB while serving - close something before starting it"
   elif ((avail_mb < MODEL_RAM_FULL_MB)); then
     # Runs, but not every expert stays cached: the SSD is in the loop, and a prompt read on the CPU
-    # evicts what the next token needs. Measured in docs/qwen.md#native-linux.
+    # evicts what the next token needs. Measured in docs/qwen38-flash.md#native-linux-every-expert-cached.
     soft "RAM: ${avail_mb} of ${total_mb} MB available - $MODEL keeps every expert cached from ~${MODEL_RAM_FULL_MB} MB; below that it reads from the SSD (~17 instead of ~19 tok/s, prompts at ~70 instead of ~100). Close the browser and editors, or run it on native Linux${wslhint:+ rather than WSL2}"
   else
     pass "RAM: ${avail_mb} of ${total_mb} MB available, $MODEL holds ~${MODEL_RAM_MB} MB"
   fi
 elif ((avail_mb < 3000)); then
-  hard "RAM: ${avail_mb} MB available - serving needs ~8 GB of headroom, see docs/dev.md#ram-and-build-memory"
+  hard "RAM: ${avail_mb} MB available - serving needs ~8 GB of headroom, see docs/setup.md#ram-and-build-memory"
 elif ((avail_mb < 7500)); then
   soft "RAM: ${avail_mb} MB available - the model loads through mmap and peaks at 5.8 GB; the build falls back to fewer jobs"
 else
@@ -123,7 +123,7 @@ case "$BACKEND" in
       # never enrolled, and nvidia-smi only says it cannot reach the driver.
       if ! grep -q '^nvidia ' /proc/modules 2>/dev/null && has mokutil \
          && mokutil --sb-state 2>/dev/null | grep -qi 'enabled'; then
-        hard "driver: the nvidia kernel module is not loaded and Secure Boot is on - its signing key is probably not enrolled, see docs/dev.md#secure-boot"
+        hard "driver: the nvidia kernel module is not loaded and Secure Boot is on - its signing key is probably not enrolled, see docs/setup.md#secure-boot"
       else
         hard "driver: nvidia-smi fails - ${out%%$'\n'*}"
       fi
@@ -134,12 +134,12 @@ case "$BACKEND" in
     fi
     nv="$(nvcc_version)"
     if [[ -n "$nv" ]] && ! version_ge "$nv" 12.4; then
-      runs build && hard "toolchain: nvcc $nv is older than 12.4 - see docs/dev.md#cuda-from-nvidias-repository"
+      runs build && hard "toolchain: nvcc $nv is older than 12.4 - see docs/setup.md#cuda-from-nvidias-repository"
     elif [[ -z "$nv" ]] && runs deps && has apt-get; then
       # deps would install apt's toolkit; say now, not after the other packages, if it is too old.
       cand="$(apt_cuda_version)"
       if [[ -z "$cand" ]] || ! version_ge "$cand" 12.4; then
-        hard "toolchain: apt offers CUDA ${cand:-nothing} here, the build needs >= 12.4 - install cuda-toolkit-12-9 from NVIDIA's repository first, see docs/dev.md#cuda-from-nvidias-repository"
+        hard "toolchain: apt offers CUDA ${cand:-nothing} here, the build needs >= 12.4 - install cuda-toolkit-12-9 from NVIDIA's repository first, see docs/setup.md#cuda-from-nvidias-repository"
       fi
     elif [[ -z "$nv" ]] && runs build && ! runs deps; then
       hard "toolchain: nvcc not found and 'deps' is not in this run - install CUDA >= 12.4 or run ./install.sh deps"
@@ -184,7 +184,7 @@ if ((vram_total > 0)); then
     pass "VRAM: ${vram_total} MiB total"
   fi
   # A desktop on this GPU takes 0.5-1.2 GB, which is exactly the headroom the 64k profile does
-  # not have. See docs/dev.md#vram-budget.
+  # not have. See docs/bonsai.md#vram-budget.
   if ((vram_used > 400)) && [[ "$PROFILE" == dedicated ]]; then
     soft "VRAM: ${vram_used} MiB already in use - something (a desktop?) is on this GPU; the 'dedicated' profile fills the card to within a few hundred MiB. Use PROFILE=display, or move the display to an iGPU"
   fi
@@ -198,7 +198,7 @@ if runs pi; then
   # Ubuntu 24.04 ships 18, Debian 13 20: nvm is the usual source, and it only reaches the PATH of a
   # shell that read ~/.bashrc.
   nvm_node="$(ls -d "${NVM_DIR:-$HOME/.nvm}"/versions/node/v* 2>/dev/null | sort -V | tail -1)"
-  nvm_hint=" - install one with nvm or NodeSource, see docs/dev.md#toolchain"
+  nvm_hint=" - install one with nvm or NodeSource, see docs/setup.md#toolchain"
   [[ -n "$nvm_node" ]] && version_ge "${nvm_node##*/v}" 22.19 \
     && nvm_hint=" - nvm has ${nvm_node##*/}, but not on this shell's PATH: run from a shell that loads nvm (source ~/.nvm/nvm.sh)"
   if ! has node; then
@@ -223,7 +223,7 @@ fi
 # --- verdict ----------------------------------------------------------------
 echo
 if ((fails > 0)); then
-  die "preflight: $fails problem(s) above must be fixed first - troubleshooting is in docs/dev.md#troubleshooting (SKIP_PREFLIGHT=1 goes ahead anyway)"
+  die "preflight: $fails problem(s) above must be fixed first - troubleshooting is in docs/setup.md#troubleshooting (SKIP_PREFLIGHT=1 goes ahead anyway)"
 fi
 ((warns > 0)) && warn "preflight: $warns warning(s), continuing"
 log "preflight passed"
