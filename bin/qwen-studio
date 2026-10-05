@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Opens the model MODEL names in Unsloth Studio, on this repo's llama.cpp build and with the flags
+# qwen-server uses (scripts/server-flags.sh): `unsloth studio run` with LLAMA_SERVER_PATH set to
+# LLAMA_SERVER, the window and drafting as Studio options, the rest passed through to its
+# llama-server, where they win over the values Studio picks itself. Studio's chat UI and API then
+# serve the measured setup. Needs Unsloth Studio installed (UNSLOTH_CLI). Extra arguments go to
+# `unsloth studio run` (e.g. --port, --api-only); --print shows the command instead of running it.
+# Rationale: docs/agent.md#unsloth-studio.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+source "$ROOT/config.env"
+source "$ROOT/scripts/server-flags.sh"
+
+die() { printf '\033[1;31mxx\033[0m %s\n' "$*" >&2; exit 1; }
+
+print=false
+if [[ "${1:-}" == "--print" ]]; then print=true; shift; fi
+
+cli="$UNSLOTH_CLI"
+[[ -x "$cli" ]] || cli="$(command -v unsloth || true)"
+[[ -n "$cli" ]] || $print || die "Unsloth Studio's unsloth command not found at $UNSLOTH_CLI or on PATH - install Studio (https://github.com/unslothai/unsloth) or set UNSLOTH_CLI"
+[[ -x "$LLAMA_SERVER" ]] || $print || die "llama-server not found at $LLAMA_SERVER - run MODEL=$MODEL ./install.sh build"
+[[ -f "$MODEL_PATH" ]] || $print || die "model not found at $MODEL_PATH - run MODEL=$MODEL ./install.sh model"
+
+# Studio drafts on its own when it finds an MTP head; qwen-server's SPEC_TYPE decides instead.
+case "$SPEC_TYPE" in
+  draft-mtp) spec=mtp ;;
+  "" | none) spec=off ;;
+  *) die "SPEC_TYPE=$SPEC_TYPE has no Unsloth Studio equivalent here (draft-mtp or none)" ;;
+esac
+
+# Studio's default memory mode, auto, keeps an explicitly requested window and appends the flags
+# below after its own, so the profile's placement wins (--fit off, every layer on the card, the
+# experts of CPU_MOE layers in RAM). Its manual mode would strip them and has no option for the
+# expert count. One slot as in qwen-server: Studio's default of 4 splits CTX. The sampling
+# options pin the values over what the UI or a request would send.
+args=(studio run --model "$MODEL_PATH" --context-length "$CTX"
+  --parallel 1 --speculative-type "$spec"
+  --temperature "$SAMPLING_TEMP" --top-p "$SAMPLING_TOP_P" --top-k "$SAMPLING_TOP_K" --min-p "$SAMPLING_MIN_P"
+  "${LOAD_FLAGS[@]}"
+  # Studio loads a vision projector it finds beside the GGUF; no profile budgets VRAM for one.
+  --no-mmproj
+  # Studio reads the model into memory (--load-mode none) when it estimates it fits; the experts
+  # in RAM are measured mmapped, through the page cache. auto is llama.cpp's default: mmap.
+  --load-mode auto
+  "$@")
+
+export LLAMA_SERVER_PATH="$LLAMA_SERVER"
+
+if $print; then
+  printf 'LLAMA_SERVER_PATH=%q' "$LLAMA_SERVER_PATH"
+  printf ' %q' "${cli:-unsloth}" "${args[@]}"
+  printf '\n'
+  exit 0
+fi
+exec "$cli" "${args[@]}"

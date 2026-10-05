@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Starts the model MODEL names (by default the one ./install.sh recorded, else Qwen3.6-35B-A3B) on
+# the llama.cpp tree its model file pins, with the settings from config.env, the profile and models/$MODEL.env. The flags they
+# turn into are in scripts/server-flags.sh, shared with bin/qwen-studio.
+# Extra arguments go straight to llama-server and override the defaults. Rationale: docs/dev.md.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+source "$ROOT/config.env"
+
+[[ -x "$LLAMA_SERVER" ]] || { echo "llama-server not found at $LLAMA_SERVER - run ./install.sh" >&2; exit 1; }
+[[ -f "$MODEL_PATH" ]] || { echo "model not found at $MODEL_PATH - run ./install.sh model" >&2; exit 1; }
+
+source "$ROOT/scripts/server-flags.sh"
+args=(-m "$MODEL_PATH"
+  --host "$LISTEN_HOST" --port "$PORT" --alias "$MODEL_ALIAS"
+  -c "$CTX" "${LOAD_FLAGS[@]}" --parallel 1)
+if [[ -n "$SPEC_TYPE" ]]; then args+=(--spec-type "$SPEC_TYPE"); fi
+args+=(--temp "$SAMPLING_TEMP" --top-p "$SAMPLING_TOP_P" --top-k "$SAMPLING_TOP_K" --min-p "$SAMPLING_MIN_P")
+
+exec "$LLAMA_SERVER" "${args[@]}" "$@"

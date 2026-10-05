@@ -4,7 +4,7 @@
 // the plan gate is not the model's guess), and the `dispatch` tool starts one localagent-* agent as
 // a separate `pi -p` process, one at a time, and appends its result to localagent/LOG.md, the run's
 // ledger. Without the flag it does nothing.
-// Two limits come from the environment, set by bin/bonsai-pi from config.env: LOCALAGENT_AGENT_MODEL,
+// Two limits come from the environment, set by bin/qwen-pi from config.env: LOCALAGENT_AGENT_MODEL,
 // the models.json entry the agents run on (a smaller thinking budget than the orchestrator), and
 // LOCALAGENT_MAX_TURNS, a backstop after which a runaway dispatch is killed and reported as BLOCKED.
 // After a DONE the tool runs the unit's test command itself, so the gate is a fact in the result,
@@ -110,7 +110,7 @@ export default function (pi: ExtensionAPI) {
 		}
 
 		ctx.ui.notify(
-			`localagent is frozen and not recommended: on this model it fails real tasks that bonsai-pi without ` +
+			`localagent is frozen and not recommended: on this model it fails real tasks that qwen-pi without ` +
 				`--localagent finishes. Agents: ${AGENT_MODEL || "the session model"}, at most ${MAX_TURNS} turns each. ` +
 				`See docs/localagent.md#status.`,
 			"warning",

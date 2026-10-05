@@ -29,7 +29,7 @@ brief, waits for it, and returns one result line.
 **A brief is facts**: the absolute working directory, the commands, the unit's row from `PLAN.md`,
 the absolute paths of the files it builds on. No instructions: each agent has its own, and one in a
 brief competes with them. Nothing replaces a dispatch, not even creating a directory. No `dispatch`
-tool means the session was not started with `bonsai-pi --localagent`: say so and stop.
+tool means the session was not started with `qwen-pi --localagent`: say so and stop.
 
 ## 1. Plan
 

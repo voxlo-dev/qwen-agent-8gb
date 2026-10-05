@@ -1,4 +1,4 @@
-# Backlog — bonsai-local
+# Backlog — qwen-agent-8gb
 
 Ticket index. A ticket is a file: summary, category, importance, effort, what depends on it,
 then **Why** and **What**. Copy the shape of any open one.
@@ -7,23 +7,34 @@ Numbers have gaps: a closed ticket's file is deleted, and a ticket that is nobod
 is named `T-NNN-{slug}.local.md`, which `.gitignore` keeps out of the repo. The counter below never
 reuses a number either way.
 
-**Next ticket: `T-038`**
+**Next ticket: `T-051`**
 
 ## Draft
 
 ## Backlog
 
-- [`T-004`](T-004-fresh-install-e2e.md) Verify a fresh install end to end — run the README from a clean WSL2 Ubuntu 26.04 instance to a working pi session · chore · high · S
-- [`T-005`](T-005-other-distros.md) Settle which Linux systems `deps` supports — test Ubuntu 24.04, 22.04 and Debian 13, then support or reject them early · decision · medium · M
-- [`T-006`](T-006-native-linux-driver.md) Verify apt's CUDA toolkit next to a native NVIDIA driver — check for a driver/library version mismatch · chore · medium · S
-- [`T-007`](T-007-blackwell.md) Verify the build on an RTX 50xx — Blackwell with CUDA >= 12.8 from NVIDIA · chore · low · S
-- [`T-008`](T-008-vram-scaling.md) Measure context per VRAM size and with a shared display — derive CTX and the pi budget from free VRAM · decision · medium · M
-- [`T-015`](T-015-context-safety-tokens.md) Decide whether to shrink pi's 4096-token safety margin — patch, upstream or leave · decision · low · S
-- [`T-017`](T-017-upstream-ptq1_0-vulkan-patch.md) Hand the PTQ1_0 Vulkan decode to the fork’s #185 — a comment with the measurement and the patch link, not a PR (two PRs were ahead, and the fork’s rules need an author who can defend every line); drop `patches/vulkan/` once a pin carries an equivalent · chore · medium · S
-- [`T-031`](T-031-sharp-chat-template.md) Measure the Qwen Sharp chat template — one plain session with `--chat-template-file`, thinking per turn and turns to result; expectation small, the delta is one terseness block · spike · low · S
-- [`T-032`](T-032-docker-server-image.md) A Dockerfile for the server, not for pi — `llama-server` in a container, pi stays on the host through `SERVER_HOST`; answers the apt-toolchain problem (T-005) and nothing about drivers, VRAM or the profile · feature · medium · M
-- [`T-034`](T-034-qwen-moe-model.md) A second model: Qwen3.6-35B-A3B with the experts in RAM — measured and built (`MODEL=qwen36-35b`, 131k, MTP on mainline); one agent session run (Tron in 7 min, rematch broken); left: supported or experimental, the `display` check; the slot a Qwen 4 35B-A3B drops into · feature · medium · S
-- [`T-037`](T-037-moe-cpu-threads.md) Threads for the experts in RAM — `-t 7` of 8 vCPUs is ~10 % faster on the RX 570 box; measure on the 4060 Ti, then a `THREADS` setting, a cores-minus-one default, or nothing · spike · low · S
+In this order. T-044 reframed the repo on 2026-10-04 (Qwen3.6 the default, `qwen-*` commands,
+the model chosen by RAM, a new README); what is left of it is the GitHub rename, by the author.
+T-045 is small; T-050 replaces the Tron reading and absorbed T-035 (Bonsai in the study's harness)
+on 2026-10-04. T-032 stands alone; T-017 waits for upstream. T-038 closed on 2026-10-02:
+both Qwen models on Unsloth's tree, built from source. T-041 closed on 2026-10-03: 64k final,
+Swift-Bonsai-2 not wired, the agent prompt stays, Qwen3.6 supported (agent-sessions.md). T-049
+closed on 2026-10-03: Qwen3.8-Flash ran the CUDA pool out of the card at 19-48k on the CCCL 2.8
+top-k fallback; the Unsloth tree now builds with CCCL 3.2 (qwen38-flash.md), all three models filled.
+T-046 closed on 2026-10-04: Flash with and without Sharp (agent-sessions.md), Sharp better in
+one pair, open until T-050 validates it;
+its hung tools gave pi a default bash timeout. T-047,
+the docs split per model and topic (`docs/dev.md` now the index), done on 2026-10-03 without a
+ticket file. T-043 closed on 2026-10-04: `qwen-studio` on the card costs neither VRAM nor speed
+(agent.md#unsloth-studio).
+
+- [`T-050`](T-050-reproducible-agent-test.md) A reproducible agent test in place of the single Tron session — fixed tasks with a checker, several runs per model, pass rate and time instead of one reading; harnesses comparable (pi, OpenCode); validates Sharp on Flash · spike · high · M
+- [`T-044`](T-044-qwen-for-8gb.md) Rebranding: Qwen for 8 GB VRAM — done in the repo on 2026-10-04; left: the GitHub rename `bonsai-agent-8gb` → `qwen-agent-8gb` and the remote, then a fresh clone on a 32 GB machine · feature · high · S
+- [`T-045`](T-045-swift-bonsai-pin.md) Bonsai's pin to Swift-Bonsai-2 — the author's call after T-041 (W marginally better, nothing worse, a drop-in); the doc says it is not a measured win · chore · low · S
+- [`T-048`](T-048-vision-profile.md) Vision on the CPU — the projector with `--no-mmproj-offload` and capped image tokens, so pi can read the screenshots its e2e tests take (B2 tried); no VRAM cost, the RAM and encode time measured per model, opt-in · feature · medium · M
+- [`T-042`](T-042-display-profiles.md) The `display` profiles, checked once with a desktop on the card — all three are arithmetic or measured without one; Bonsai's largest `q8_0`/`q4_0` window; needs a monitor on the headless machine; merges T-008's display half · decision · medium · S
+- [`T-032`](T-032-docker-server-image.md) A Dockerfile for the server, not for pi — `llama-server` in a container, pi stays on the host through `SERVER_HOST`; answers the apt-toolchain problem off the host and nothing about drivers, VRAM or the profile · feature · medium · M
+- [`T-017`](T-017-upstream-ptq1_0-vulkan-patch.md) Upstream: a pin that makes the Vulkan patch, then the fork, unnecessary — comment on the fork's #185 posted, #252 matches the patch on generation; watch #252 and mainline #29077, then move the pin, re-measure both cards, drop what is no longer needed; merges T-029 · decision · medium · S
 
 ## Open source (release checklist)
 
@@ -31,10 +42,9 @@ Closed on 2026-09-21: the history audit (clean, no rewrite needed), the MIT lice
 disclaimer, acknowledgements, the experimental label on the localagent workflow, and the terminal
 UX with `scripts/preflight.sh`.
 
-Public since 2026-09-21 at <https://github.com/voxlo-dev/bonsai-agent-8gb>, tagged `v0.1.0`.
-Remaining order: T-035 → T-017 comment posted. T-020 and T-029 follow the reports and the upstream merge.
+Public since 2026-09-21 at <https://github.com/voxlo-dev/bonsai-agent-8gb> (to become
+`qwen-agent-8gb`, T-044), tagged `v0.1.0`.
+T-020 follows the reports. T-024 (repo setup) closed on 2026-10-02:
+both issue templates render.
 
-- [`T-020`](T-020-supported-hardware.md) Finish the hardware table — 12/16 GB profiles and the rows that hardware reports bring in; the three tiers are already in the README · decision · medium · M
-- [`T-024`](T-024-public-repo-setup.md) Public repo setup — done except confirming the two issue templates render · chore · low · S
-- [`T-035`](T-035-bonsai-measured.md) Measure Bonsai the way T-034 measures Qwen — speed, window, KV quality and the behaviour day done (96k not yet: its session lost itself in a test harness); left: a second 96k/64k pair on the new agent prompt, then the study-harness run twice for the quality claim; was T-027 and T-033 · spike · high · M
-- [`T-029`](T-029-upstream-watch.md) Watch mainline — move off the fork when ggml-org takes PTQ1_0 (#29077), keep the Vulkan patch alive · decision · medium · M
+- [`T-020`](T-020-supported-hardware.md) Finish the hardware table — 12/16 GB profiles, Blackwell, RDNA2/3, from the rows hardware reports bring in; the three tiers are already in the README; merges T-007 and T-008's bigger-cards half · decision · medium · M
