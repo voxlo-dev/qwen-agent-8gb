@@ -43,17 +43,32 @@ for s in "${steps[@]}"; do
   case "$s" in deps|build|model|pi|link) ;; *) die "unknown step '$s' (deps build model pi link)" ;; esac
 done
 
+# What the qwen-* commands run without MODEL is recorded once, after preflight passed, so a model
+# this machine cannot hold never sticks: the answer here, else the model from the environment (the
+# first one installed), else the one an install from before the rename ran (Bonsai), else without a
+# terminal the recommendation for this RAM.
 model_file="$QWEN_HOME/model.env"
-if [[ "$MODEL_FROM" != file && ! -f "$model_file" ]]; then
-  chosen="$MODEL"
-  if [[ "$MODEL_FROM" == default && -t 0 && -t 1 ]]; then chosen="$(choose_model)"; fi
+record=""
+if [[ ! -f "$model_file" ]]; then
+  case "$MODEL_FROM" in
+    env | legacy) record="$MODEL" ;;
+    default)
+      if [[ -t 0 && -t 1 ]]; then record="$(choose_model)"
+      else record="$(recommended_model "$(mem_total_mb)")"; record="${record:-$MODEL}"
+      fi
+      # config.env has already resolved everything for the default; another model starts over,
+      # with it in the environment, which records it after preflight like any MODEL.
+      [[ "$record" == "$MODEL" ]] || MODEL="$record" exec bash "$ROOT/install.sh" "$@"
+      ;;
+  esac
+fi
+record_model() {
+  [[ -n "$record" ]] || return 0
   mkdir -p "$QWEN_HOME"
   printf '# Written by install.sh: the model the qwen-* commands run when MODEL is not set.\nMODEL=%s\n' \
-    "$chosen" > "$model_file"
-  log "default model: $chosen, recorded in $model_file"
-  # config.env has already resolved everything for the default; a different answer starts over.
-  [[ "$chosen" == "$MODEL" ]] || exec bash "$ROOT/install.sh" "$@"
-fi
+    "$record" > "$model_file"
+  log "default model: $record, recorded in $model_file (edit it to change)"
+}
 
 # Names the step that failed instead of leaving the last command's message alone on the screen.
 current=""
@@ -70,6 +85,7 @@ on_err() {
 trap on_err ERR
 
 [[ -n "${SKIP_PREFLIGHT:-}" ]] || { current=preflight; bash "$ROOT/scripts/preflight.sh" "${steps[@]}"; echo; }
+record_model
 
 for s in "${steps[@]}"; do
   current="$s"

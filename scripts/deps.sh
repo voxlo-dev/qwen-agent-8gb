@@ -57,7 +57,7 @@ case "$BACKEND" in
     log "Vulkan device: $device, driver $driver"
     # RADV_PERFTEST=nogttspill, which qwen-server sets, is silently ignored below Mesa 25.2
     # and is worth 1.22x on this model. Debian 13 ships 25.0.7; trixie-backports has 26.x.
-    if [[ "$driver" =~ ^[0-9]+\.[0-9]+ ]] && [[ "$(printf '%s\n' 25.2 "$driver" | sort -V | head -1)" != 25.2 ]]; then
+    if [[ "$driver" =~ ^[0-9]+\.[0-9]+ ]] && ! version_ge "$driver" 25.2; then
       warn "Mesa $driver is older than 25.2: RADV_PERFTEST=nogttspill will be ignored, expect ~1.2x slower - see docs/bonsai.md#other-gpu-backends"
     fi
     ;;

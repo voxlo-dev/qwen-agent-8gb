@@ -108,7 +108,8 @@ which resets `last_query_index`.
 which is the mode this setup runs (`--reasoning on`, and the whole budget arithmetic depends on
 it). The card's second preset - `temperature=0.7, top_p=0.80, presence_penalty=1.5` - belongs to
 instruct/non-thinking mode. It is a mode, not a temperature dial: taking the 0.7 alone into
-thinking mode mixes two presets and is not what the card recommends.
+thinking mode mixes two presets and is not what the card recommends. The values are `SAMPLING_TEMP`, `SAMPLING_TOP_P`,
+`SAMPLING_TOP_K` and `SAMPLING_MIN_P` in `config.env`, so an experiment sets them per run.
 
 `--min-p 0.0` has to be passed explicitly. llama.cpp defaults it to 0.05, so leaving it out
 silently deviates from the preset; the flag's own help reads `0.0 = disabled`. This was the only

@@ -27,7 +27,7 @@ if [[ "$(uname -s)" != Linux ]]; then
 else
   # A derivative (Linux Mint, Pop!_OS) names its base in ID_LIKE and UBUNTU_CODENAME; what 'deps'
   # can install depends on that base, not on the name on top.
-  IFS='|' read -r distro id family codename < <( . /etc/os-release 2>/dev/null
+  IFS='|' read -r distro id family codename < <( . /etc/os-release 2>/dev/null || true
     printf '%s %s|%s|%s %s|%s\n' "${NAME:-?}" "${VERSION_ID:-}" "${ID:-}" "${ID:-}" "${ID_LIKE:-}" "${UBUNTU_CODENAME:-}" )
   base=""; [[ -n "$codename" && "$id" != ubuntu ]] && base=", Ubuntu $codename base"
   wsl=""; grep -qi microsoft /proc/version 2>/dev/null && wsl=" (WSL2)"
@@ -52,10 +52,18 @@ esac
 # --- disk -------------------------------------------------------------------
 need_home=0
 runs build && need_home=$((need_home + 2000))
-# A model already in place needs nothing more; model.sh finds it and stops. Nor does one in the
-# Hugging Face cache, which model.sh links instead of downloading.
-hf_model="${HF_HOME:-$HOME/.cache/huggingface}/hub/models--${MODEL_REPO//\//--}/snapshots/$MODEL_REV/$MODEL_FILE"
-runs model && [[ ! -f "$MODEL_PATH" && ! -f "$hf_model" ]] && need_home=$((need_home + MODEL_DISK_MB))
+# A part already in place needs nothing more; model.sh finds it and skips it. Nor does one in the
+# Hugging Face cache, which model.sh links instead of downloading. For a split GGUF each missing
+# part counts its share of MODEL_DISK_MB, so a download cut short after part 1 still asks for the rest.
+if runs model; then
+  hf_dir="${HF_HOME:-$HOME/.cache/huggingface}/hub/models--${MODEL_REPO//\//--}/snapshots/$MODEL_REV"
+  mapfile -t parts < <(model_parts)
+  missing=0
+  for p in "${parts[@]}"; do
+    [[ -f "$(dirname "$MODEL_PATH")/$(basename "$p")" || -f "$hf_dir/$p" ]] || missing=$((missing + 1))
+  done
+  need_home=$((need_home + MODEL_DISK_MB * missing / ${#parts[@]}))
+fi
 runs pi    && need_home=$((need_home + 500))
 if ((need_home > 0)); then
   have="$(free_mb "$QWEN_HOME")"
@@ -203,7 +211,7 @@ fi
 if runs pi; then
   # Ubuntu 24.04 ships 18, Debian 13 20: nvm is the usual source, and it only reaches the PATH of a
   # shell that read ~/.bashrc.
-  nvm_node="$(ls -d "${NVM_DIR:-$HOME/.nvm}"/versions/node/v* 2>/dev/null | sort -V | tail -1)"
+  nvm_node="$(ls -d "${NVM_DIR:-$HOME/.nvm}"/versions/node/v* 2>/dev/null | sort -V | tail -1 || true)"
   nvm_hint=" - install one with nvm or NodeSource, see docs/setup.md#toolchain"
   [[ -n "$nvm_node" ]] && version_ge "${nvm_node##*/v}" 22.19 \
     && nvm_hint=" - nvm has ${nvm_node##*/}, but not on this shell's PATH: run from a shell that loads nvm (source ~/.nvm/nvm.sh)"

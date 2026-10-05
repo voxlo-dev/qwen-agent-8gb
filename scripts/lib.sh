@@ -14,10 +14,24 @@ version_ge() { [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -1)" == "$2" ]]; }
 # NVIDIA's own packages put nvcc in /usr/local/cuda/bin, which no shell has on its PATH by default.
 if ! has nvcc && [[ -x /usr/local/cuda/bin/nvcc ]]; then PATH="/usr/local/cuda/bin:$PATH"; fi
 
-# The installed nvcc's release (12.9), and the one apt would install (12.0, or empty for none).
-nvcc_version() { nvcc --version 2>/dev/null | sed -n 's/.*release \([0-9]*\.[0-9]*\).*/\1/p'; }
+# The installed nvcc's release (12.9), and the one apt would install (12.0); empty for none. A
+# missing command must not fail the pipeline: under pipefail its 127 would end the caller.
+nvcc_version() { { nvcc --version 2>/dev/null || true; } | sed -n 's/.*release \([0-9]*\.[0-9]*\).*/\1/p'; }
 apt_cuda_version() {
-  LC_ALL=C apt-cache policy nvidia-cuda-toolkit 2>/dev/null | sed -n 's/^ *Candidate: \([0-9]*\.[0-9]*\).*/\1/p'
+  { LC_ALL=C apt-cache policy nvidia-cuda-toolkit 2>/dev/null || true; } \
+    | sed -n 's/^ *Candidate: \([0-9]*\.[0-9]*\).*/\1/p'
+}
+
+# MODEL_FILE's parts, one per line: itself, or for a split GGUF (-00001-of-0000N.gguf) every part.
+model_parts() {
+  if [[ "$MODEL_FILE" =~ ^(.*)-00001-of-([0-9]{5})\.gguf$ ]]; then
+    local i
+    for ((i = 1; i <= 10#${BASH_REMATCH[2]}; i++)); do
+      printf '%s-%05d-of-%s.gguf\n' "${BASH_REMATCH[1]}" "$i" "${BASH_REMATCH[2]}"
+    done
+  else
+    printf '%s\n' "$MODEL_FILE"
+  fi
 }
 
 # --- the models by RAM: preflight reports them, install.sh asks with them ---------------------

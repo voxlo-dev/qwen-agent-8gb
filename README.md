@@ -123,7 +123,7 @@ the CUDA toolkit. Drivers, toolkit versions, Node for pi and what `deps` install
 The model you pick is recorded in `$QWEN_HOME/model.env` and used by every `qwen-*` command. A
 second one installs next to it with `MODEL=bonsai ./install.sh` and runs with `MODEL=bonsai qwen-pi`.
 Everything lands in `~/.local/share/qwen-local` (`QWEN_HOME`); an install from before the rename,
-in `~/.local/share/bonsai-local`, stays where it is.
+in `~/.local/share/bonsai-local`, stays where it is and keeps running Bonsai.
 
 ## How it was measured
 

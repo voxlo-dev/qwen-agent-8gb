@@ -35,6 +35,3 @@ else
 fi
 if [[ -n "$SERVER_ARGS" ]]; then read -ra _extra <<<"$SERVER_ARGS"; LOAD_FLAGS+=("${_extra[@]}"); fi
 
-# Bonsai's recommended sampling, kept for Qwen too: it is what Qwen used for its own agent
-# benchmarks. See docs/bonsai.md#sampling.
-SAMPLING_TEMP=1.0 SAMPLING_TOP_P=0.95 SAMPLING_TOP_K=20 SAMPLING_MIN_P=0.0

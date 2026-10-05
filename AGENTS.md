@@ -21,6 +21,7 @@ incomplete, and a change that contradicts one needs a new measurement, not an ar
 | --- | --- |
 | `config.env` | **Single source of truth.** Every setting, with `: "${VAR:=default}"` so an environment variable always wins. Sources the profile, then the model file |
 | `models/{bonsai,qwen36-35b,qwen38-flash}.env` | Per `MODEL` (the environment, else `$QWEN_HOME/model.env` from `install.sh`, else `qwen36-35b`): the GGUF pin, the llama.cpp tree that runs it (`LLAMA_*`, `PATCH_DIR`), KV types, `EFFORT`, `SPEC_TYPE`, what preflight checks (disk, RAM, backends) and how the model list shows it (`MODEL_TITLE`, `MODEL_ROLE`); `SERVER_ARGS` for flags no setting covers |
+| `models/trees/unsloth.env` | Unsloth's llama.cpp pin, sourced by both Qwen model files on CUDA since they share its build dir. Not a model: the model list reads `models/*.env` only |
 | `profiles/{model}/{dedicated,display}.env` | `CTX` and the four budget values, per model and GPU situation (`PROFILE`, default `dedicated`); for the MoE also `CPU_MOE` and `UB`. They constrain each other, so they move together |
 | `install.sh` | Step runner: `deps build model pi link`, all of them by default. Without `MODEL` and `model.env` it asks for the model by the RAM (on a terminal) and records it; then runs `preflight` |
 | `scripts/preflight.sh` | Gates a run before it spends time: disk, RAM and the models it allows, driver, VRAM, Node, port. Reports every item, exits once. `SKIP_PREFLIGHT=1` bypasses it |

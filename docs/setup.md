@@ -225,7 +225,7 @@ an hour of work rather than before it.
 
 It checks the distro (a derivative by its base, from `ID_LIKE` and `UBUNTU_CODENAME`), free disk
 against what the named steps will actually write (a model in the Hugging Face cache costs
-nothing), `MemAvailable`, the driver for `BACKEND` (on native Linux, a module that Secure Boot
+nothing, and of a split GGUF only the missing parts count), `MemAvailable`, the driver for `BACKEND` (on native Linux, a module that Secure Boot
 kept out), the CUDA toolchain the run will use (the installed `nvcc`, or the version apt would
 install), `cmake` and `git` for a build without `deps`, total and used VRAM, Node for the `pi`
 step (and whether nvm has a newer one off the `PATH`), and whether something is already answering
@@ -245,8 +245,11 @@ true on three machines and should not be the thing that stops a fourth.
 It also says which models the machine's RAM runs and which one it recommends: `MemTotal` against
 each model file's `MODEL_RAM_MB` plus ~2 GB, the same gate the selected model is held to, and
 Qwen3.6 as the recommendation wherever it fits (Qwen3.8-Flash is never recommended, only chosen).
-Before preflight, a first `./install.sh` without `MODEL` shows the same list as a numbered question
-and records the answer in `$QWEN_HOME/model.env` ([README](../README.md#install-in-detail)). Both
+Before preflight, a first `./install.sh` without `MODEL` shows the same list as a numbered question;
+without a terminal it takes the recommendation. The answer is recorded in `$QWEN_HOME/model.env`
+only once preflight has passed, so a model the machine cannot hold never sticks
+([README](../README.md#install-in-detail)). An install from before the rename (in `bonsai-local`,
+with a `pi-agent/` and no `model.env`) keeps Bonsai, which it ran until then. Both
 read the model files with `model_var` in `scripts/lib.sh`, so a new model file joins the list by
 its `MODEL_RAM_MB`, `MODEL_TITLE` and `MODEL_ROLE`.
 

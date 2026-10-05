@@ -33,20 +33,21 @@ cd "$LLAMA_DIR"
 if [[ -n "$LLAMA_TARBALL" ]]; then
   # Unsloth's source commit is not fetchable ("not our ref"), so its release tarball is the source
   # and its checksum the pin. Everything but build/ is replaced, which keeps the tree as clean as
-  # a forced checkout and the cmake cache and ccache as warm.
+  # a forced checkout and the cmake cache and ccache as warm. The marker is written before the
+  # tree is touched, so an unpack cut short (Ctrl+C, a full disk) is redone by the next run.
   [[ -n "$LLAMA_TARBALL_SHA256" ]] || die "LLAMA_TARBALL is set without LLAMA_TARBALL_SHA256 - a tarball source needs its checksum in the model file"
   [[ -z "$(ls -A)" || -f .bonsai-tarball ]] \
     || die "$LLAMA_DIR is not empty and not a tarball tree this script unpacked - point LLAMA_DIR elsewhere or empty it"
   log "fetching ${LLAMA_TARBALL##*/} (${LLAMA_COMMIT:0:7})"
   tarball="$(mktemp)"
-  curl -fsSL --retry 3 -o "$tarball" "$LLAMA_TARBALL" || { rm -f "$tarball"; die "could not download $LLAMA_TARBALL"; }
+  trap 'rm -f "$tarball"' EXIT
+  curl -fsSL --retry 3 -o "$tarball" "$LLAMA_TARBALL" || die "could not download $LLAMA_TARBALL"
   have_sha="$(sha256sum "$tarball" | cut -d' ' -f1)"
   [[ "$have_sha" == "$LLAMA_TARBALL_SHA256" ]] \
-    || { rm -f "$tarball"; die "$LLAMA_TARBALL has sha256 $have_sha, the model file pins $LLAMA_TARBALL_SHA256 - not unpacking it"; }
-  find . -mindepth 1 -maxdepth 1 ! -name build -exec rm -rf {} +
-  tar xzf "$tarball" --strip-components=1
-  rm -f "$tarball"
+    || die "$LLAMA_TARBALL has sha256 $have_sha, the model file pins $LLAMA_TARBALL_SHA256 - not unpacking it"
   echo "$LLAMA_TARBALL_SHA256" > .bonsai-tarball
+  find . -mindepth 1 -maxdepth 1 ! -name build ! -name .bonsai-tarball -exec rm -rf {} +
+  tar xzf "$tarball" --strip-components=1
 else
   log "fetching ${LLAMA_REPO#https://github.com/} at ${LLAMA_COMMIT:0:7}"
   [[ -d .git ]] || { git init -q; git remote add origin "$LLAMA_REPO"; }
@@ -74,8 +75,8 @@ case "$BACKEND" in
     [[ "$arch" =~ ^[0-9]+$ ]] || arch=native
 
     # nvcc before 12.8 does not know Blackwell (sm_120, RTX 50xx) and fails mid-build
-    nvcc_ver="$(nvcc --version | sed -n 's/.*release \([0-9]*\.[0-9]*\).*/\1/p')"
-    if [[ "$arch" =~ ^[0-9]+$ ]] && ((arch >= 100)) && [[ "$(printf '%s\n' 12.8 "$nvcc_ver" | sort -V | head -1)" != 12.8 ]]; then
+    nvcc_ver="$(nvcc_version)"
+    if [[ "$arch" =~ ^[0-9]+$ ]] && ((arch >= 100)) && ! version_ge "$nvcc_ver" 12.8; then
       die "GPU arch sm_$arch needs CUDA >= 12.8, found nvcc $nvcc_ver - see docs/setup.md#toolchain"
     fi
 

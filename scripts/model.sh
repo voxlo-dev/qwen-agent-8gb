@@ -5,13 +5,7 @@
 # MODEL_SHA256 entry per part in order; llama.cpp finds the other parts next to the first.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-parts=("$MODEL_FILE")
-if [[ "$MODEL_FILE" =~ ^(.*)-00001-of-([0-9]{5})\.gguf$ ]]; then
-  parts=()
-  for ((i = 1; i <= 10#${BASH_REMATCH[2]}; i++)); do
-    parts+=("$(printf '%s-%05d-of-%s.gguf' "${BASH_REMATCH[1]}" "$i" "${BASH_REMATCH[2]}")")
-  done
-fi
+mapfile -t parts < <(model_parts)
 read -ra sums <<<"$MODEL_SHA256"
 ((${#sums[@]} == ${#parts[@]})) || die "MODEL_SHA256 has ${#sums[@]} entries for ${#parts[@]} part(s) of $MODEL_FILE - one per part, in order"
 
