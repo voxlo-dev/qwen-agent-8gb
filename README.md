@@ -117,7 +117,7 @@ the CUDA toolkit. Drivers, toolkit versions, Node for pi and what `deps` install
 | `deps` | the apt toolchain: CUDA or Vulkan, cmake, gcc (asks for sudo) |
 | `build` | the model's llama.cpp tree at its pinned version (`FORCE=1` rebuilds) |
 | `model` | the GGUF, from the Hugging Face cache or downloaded, checksummed |
-| `pi` | its own pinned pi with a config for the model; your own pi and `~/.pi` stay untouched |
+| `pi` | its own pinned pi with a config for the model and [pi-bg-bash](https://github.com/gvanderclay/pi-bg-bash) for background commands; your own pi and `~/.pi` stay untouched |
 | `link` | `qwen-server`, `qwen-pi` and `qwen-studio` into `~/.local/bin` |
 
 The model you pick is recorded in `$QWEN_HOME/model.env` and used by every `qwen-*` command. A
@@ -137,6 +137,7 @@ as coding agents on an 8 GB card: [docs/model-comparison.md](docs/model-comparis
 
 ```bash
 rm -rf ~/.local/share/qwen-local ~/.local/bin/qwen-server ~/.local/bin/qwen-pi ~/.local/bin/qwen-studio
+rm -rf ~/.local/state/pi-bg   # pi-bg-bash's task logs
 ```
 
 That includes the models, pi and its sessions (`bonsai-local` for an install from before the

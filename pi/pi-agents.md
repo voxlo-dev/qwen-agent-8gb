@@ -19,6 +19,8 @@ results, not what was worked out while thinking.
   somewhere else.
 - In a summary, what you ran and what it showed is what the user can rely on. What you did not get
   to check is worth saying too.
-- A server or watcher started in the background keeps running, and keeps its port, until it is
-  stopped. A command that does not return on its own ends after a few minutes as timed out; one
-  that needs longer can pass its own `timeout`.
+- For a build, a server or anything you don't need to wait on, call bash with `background: true`
+  and the plain command, no `&` and no `timeout`: you get a task id at once, and its result arrives on its own when it ends.
+- A command still running after two minutes moves to the background as a task too. A task that
+  should have ended by then may be hanging. A server or watcher keeps running, and keeps its
+  port, until `bash_kill` stops it.
