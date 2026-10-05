@@ -26,12 +26,13 @@ one pair, open until T-050 validates it;
 its hung tools gave pi a default bash timeout. T-047,
 the docs split per model and topic (`docs/dev.md` now the index), done on 2026-10-03 without a
 ticket file. T-043 closed on 2026-10-04: `qwen-studio` on the card costs neither VRAM nor speed
-(agent.md#unsloth-studio).
+(agent.md#unsloth-studio). T-048 closed on 2026-10-05: `VISION=1` loads each model's projector on the
+CPU, no VRAM, ~1 GB of RAM, ~10 s per screenshot at 512 image tokens (agent.md#vision); Studio
+stays text only, and Flash's full-cache threshold is 59 GB.
 
 - [`T-050`](T-050-reproducible-agent-test.md) A reproducible agent test in place of the single Tron session — fixed tasks with a checker, several runs per model, pass rate and time instead of one reading; harnesses comparable (pi, OpenCode); validates Sharp on Flash · spike · high · M
 - [`T-044`](T-044-qwen-for-8gb.md) Rebranding: Qwen for 8 GB VRAM — done in the repo on 2026-10-04; left: the GitHub rename `bonsai-agent-8gb` → `qwen-agent-8gb` and the remote, then a fresh clone on a 32 GB machine · feature · high · S
 - [`T-045`](T-045-swift-bonsai-pin.md) Bonsai's pin to Swift-Bonsai-2 — the author's call after T-041 (W marginally better, nothing worse, a drop-in); the doc says it is not a measured win · chore · low · S
-- [`T-048`](T-048-vision-profile.md) Vision on the CPU — the projector with `--no-mmproj-offload` and capped image tokens, so pi can read the screenshots its e2e tests take (B2 tried); no VRAM cost, the RAM and encode time measured per model, opt-in · feature · medium · M
 - [`T-042`](T-042-display-profiles.md) The `display` profiles, checked once with a desktop on the card — all three are arithmetic or measured without one; Bonsai's largest `q8_0`/`q4_0` window; needs a monitor on the headless machine; merges T-008's display half · decision · medium · S
 - [`T-032`](T-032-docker-server-image.md) A Dockerfile for the server, not for pi — `llama-server` in a container, pi stays on the host through `SERVER_HOST`; answers the apt-toolchain problem off the host and nothing about drivers, VRAM or the profile · feature · medium · M
 - [`T-017`](T-017-upstream-ptq1_0-vulkan-patch.md) Upstream: a pin that makes the Vulkan patch, then the fork, unnecessary — comment on the fork's #185 posted, #252 matches the patch on generation; watch #252 and mainline #29077, then move the pin, re-measure both cards, drop what is no longer needed; merges T-029 · decision · medium · S

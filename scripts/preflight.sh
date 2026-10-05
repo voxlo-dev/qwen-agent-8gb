@@ -63,6 +63,9 @@ if runs model; then
     [[ -f "$(dirname "$MODEL_PATH")/$(basename "$p")" || -f "$hf_dir/$p" ]] || missing=$((missing + 1))
   done
   need_home=$((need_home + MODEL_DISK_MB * missing / ${#parts[@]}))
+  if [[ "$VISION" == 1 && ! -f "$MMPROJ_PATH" && ! -f "$hf_dir/$MMPROJ_FILE" ]]; then
+    need_home=$((need_home + MMPROJ_DISK_MB))
+  fi
 fi
 runs pi    && need_home=$((need_home + 500))
 if ((need_home > 0)); then
@@ -92,20 +95,26 @@ if [[ -z "$avail_mb" || -z "$total_mb" ]]; then
 elif ((MODEL_RAM_MB > 0)); then
   # A MoE keeps its experts in RAM for as long as it serves, so the ceiling is MemTotal: under
   # WSL2 that is half the Windows RAM unless .wslconfig says otherwise. See docs/qwen36.md.
+  # The vision projector sits in RAM next to them (docs/agent.md#vision).
   need_ram="$(ram_needed_mb "$MODEL")"
+  if [[ "$VISION" == 1 ]]; then
+    MODEL_RAM_MB=$((MODEL_RAM_MB + MMPROJ_RAM_MB)) need_ram=$((need_ram + MMPROJ_RAM_MB))
+    ((MODEL_RAM_FULL_MB > 0)) && MODEL_RAM_FULL_MB=$((MODEL_RAM_FULL_MB + MMPROJ_RAM_MB))
+  fi
+  vis=""; [[ "$VISION" == 1 ]] && vis=" with the vision projector"
   wslhint=""; grep -qi microsoft /proc/version 2>/dev/null \
     && wslhint=" - WSL2 sees half the Windows RAM by default: raise memory= in %UserProfile%\\.wslconfig, then wsl --shutdown"
   if ((total_mb < need_ram)); then
-    hard "RAM: ${total_mb} MB in total, $MODEL holds ~${MODEL_RAM_MB} MB in RAM while serving and needs ~${need_ram} MB$wslhint"
+    hard "RAM: ${total_mb} MB in total, $MODEL holds ~${MODEL_RAM_MB} MB in RAM while serving$vis and needs ~${need_ram} MB$wslhint"
   elif ((avail_mb < MODEL_RAM_MB - 4000)); then
     # Most of what it holds is the mmapped experts as page cache, which counts as available.
-    soft "RAM: ${avail_mb} of ${total_mb} MB available, $MODEL holds ~${MODEL_RAM_MB} MB while serving - close something before starting it"
+    soft "RAM: ${avail_mb} of ${total_mb} MB available, $MODEL holds ~${MODEL_RAM_MB} MB while serving$vis - close something before starting it"
   elif ((avail_mb < MODEL_RAM_FULL_MB)); then
     # Runs, but not every expert stays cached: the SSD is in the loop, and a prompt read on the CPU
     # evicts what the next token needs. Measured in docs/qwen38-flash.md#native-linux-every-expert-cached.
-    soft "RAM: ${avail_mb} of ${total_mb} MB available - $MODEL keeps every expert cached from ~${MODEL_RAM_FULL_MB} MB; below that it reads from the SSD (~17 instead of ~19 tok/s, prompts at ~70 instead of ~100). Close the browser and editors, or run it on native Linux${wslhint:+ rather than WSL2}"
+    soft "RAM: ${avail_mb} of ${total_mb} MB available - $MODEL keeps every expert cached from ~${MODEL_RAM_FULL_MB} MB$vis; below that it reads from the SSD (~17 instead of ~19 tok/s, prompts at ~70 instead of ~100). Close the browser and editors, or run it on native Linux${wslhint:+ rather than WSL2}"
   else
-    pass "RAM: ${avail_mb} of ${total_mb} MB available, $MODEL holds ~${MODEL_RAM_MB} MB"
+    pass "RAM: ${avail_mb} of ${total_mb} MB available, $MODEL holds ~${MODEL_RAM_MB} MB$vis"
   fi
 elif ((avail_mb < 3000)); then
   hard "RAM: ${avail_mb} MB available - serving needs ~8 GB of headroom, see docs/setup.md#ram-and-build-memory"

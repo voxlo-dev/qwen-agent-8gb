@@ -124,6 +124,20 @@ workload, and loosening their triggers made it worse. Acceptance runs at 6-20 % 
 break-even is above 50 %. The full result, including why a synthetic benchmark showed a
 misleading 1.59x, is in [Performance](performance.md#speculative-decoding-tried-rejected).
 
+## Vision
+
+Bonsai ships a projector too, and `VISION` ([agent.md](agent.md#vision)) loads it on the CPU next to
+a model that holds no RAM otherwise. `Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf` from the pinned
+revision, not its BF16: measured on 2026-10-05 (T-048, native, headless, 64k, `runs/T-048-vision/`)
+both encode a 1280x800 screenshot in 10.1-10.5 s at cap 512 and read it alike, the Q8_0 holds
+684 against 1 008 MiB. VRAM 7 758 MiB idle and 7 768 after a request, with and without it: the
+441 MiB of margin stay.
+
+It reads a screen's state and layout (two trails facing each other, the game-over screen, both
+buttons) but not its small print: the 10-pixel player names came back as `CyberFlash`,
+`MegaStrike` or `CygnFlash`, where both Qwen models read them. Enough to see whether a canvas drew;
+for text on screen, the DOM.
+
 ## Other GPU backends
 
 CUDA is a choice here, not a constraint of the model: the fork carries `PTQ1_0` kernels for

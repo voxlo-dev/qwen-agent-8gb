@@ -1,5 +1,6 @@
-<!-- qwen-agent-8gb: global guidance for pi, installed to $PI_AGENT_DIR/AGENTS.md by scripts/pi.sh.
-     Not this project's AGENTS.md - that one is in the repo root. -->
+<!-- qwen-agent-8gb: global guidance for pi, installed to $PI_AGENT_DIR/AGENTS.md by scripts/pi.sh,
+     which keeps one of the two vision lines at the end, after VISION. Not this project's AGENTS.md -
+     that one is in the repo root. -->
 
 ## Working here
 
@@ -24,3 +25,7 @@ results, not what was worked out while thinking.
 - A command still running after two minutes moves to the background as a task too. A task that
   should have ended by then may be hanging. A server or watcher keeps running, and keeps its
   port, until `bash_kill` stops it.
+- [vision=1] You can see images: `read` on a PNG or JPG shows you the picture, so a screenshot
+  checks what a page or canvas displays. Each one takes ~500 tokens of the window.
+- [vision=0] You cannot see images: `read` on a screenshot gives you no picture. What a page shows
+  is checked through its DOM, text output or logs.

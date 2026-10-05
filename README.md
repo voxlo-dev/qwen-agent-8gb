@@ -90,6 +90,15 @@ After changing the profile, the window or the port, run `./install.sh pi` again 
 matches the server. The window and pi's budget values constrain each other:
 [Context budget](docs/agent.md#context-budget).
 
+**Vision**, off by default: the model reads images, e.g. the screenshots of its own browser tests,
+through pi's `read`. The projector runs on the CPU, so it costs no VRAM, ~1 GB of RAM and ~10 s
+per screenshot; it stays on once installed, `VISION=0` turns it off:
+[details](docs/agent.md#vision).
+
+```bash
+VISION=1 ./install.sh model pi
+```
+
 ## Requirements
 
 Measured, each with a logged run:

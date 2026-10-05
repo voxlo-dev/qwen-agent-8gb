@@ -279,6 +279,21 @@ The same drafts accepted down to the token, and speed within 0.6 %. On Vulkan Qw
 mainline, where the RX 570 numbers above come from; whether Unsloth's tree builds and runs there
 is unmeasured. Logs: `runs/T-038-unsloth-tree/`.
 
+## Vision
+
+With `VISION` ([agent.md](agent.md#vision)) this model reads screenshots from its projector,
+`mmproj-F16.gguf` from the pinned revision, on the CPU. Measured on 2026-10-05 (T-048, native,
+headless, the shipped 131k profile, `runs/T-048-vision/`):
+
+- **VRAM** 7 274 MiB idle with and without it, 7 338 after a 1k-token prompt in both: nothing on
+  the card.
+- **RAM** +761 MiB idle, plus the 248 MiB compute buffer while it encodes.
+- **F16 against BF16**: 10.0 against 10.1 s for the same 476-token image, both read the game
+  screen with one small-print slip each. F16, the smaller file.
+- **Reading** at the default cap 512: both B2 screens right (names, `GO!`, the trails, `DOUBLE KO!`,
+  the buttons), the footer's 10-pixel text half right; the cap table is in agent.md. Its own pass
+  over the image tokens takes 1.2-1.7 s on top of the encode.
+
 ## When Qwen 4 lands
 
 `models/qwen4-35b.env` with its pin and a mainline commit that knows its architecture,

@@ -10,6 +10,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
 source "$ROOT/config.env"
+VISION=0  # Studio takes no --mmproj, see --no-mmproj below
 source "$ROOT/scripts/server-flags.sh"
 
 die() { printf '\033[1;31mxx\033[0m %s\n' "$*" >&2; exit 1; }
@@ -39,7 +40,8 @@ args=(studio run --model "$MODEL_PATH" --context-length "$CTX"
   --parallel 1 --speculative-type "$spec"
   --temperature "$SAMPLING_TEMP" --top-p "$SAMPLING_TOP_P" --top-k "$SAMPLING_TOP_K" --min-p "$SAMPLING_MIN_P"
   "${LOAD_FLAGS[@]}"
-  # Studio loads a vision projector it finds beside the GGUF; no profile budgets VRAM for one.
+  # Studio picks a vision projector from beside the GGUF itself, where it may find another model's,
+  # and refuses --mmproj, so VISION does not reach it: text only. See docs/agent.md#unsloth-studio.
   --no-mmproj
   # Studio reads the model into memory (--load-mode none) when it estimates it fits; the experts
   # in RAM are measured mmapped, through the page cache. auto is llama.cpp's default: mmap.

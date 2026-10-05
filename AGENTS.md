@@ -20,7 +20,7 @@ incomplete, and a change that contradicts one needs a new measurement, not an ar
 | Path | Role |
 | --- | --- |
 | `config.env` | **Single source of truth.** Every setting, with `: "${VAR:=default}"` so an environment variable always wins. Sources the profile, then the model file |
-| `models/{bonsai,qwen36-35b,qwen38-flash}.env` | Per `MODEL` (the environment, else `$QWEN_HOME/model.env` from `install.sh`, else `qwen36-35b`): the GGUF pin, the llama.cpp tree that runs it (`LLAMA_*`, `PATCH_DIR`), KV types, `EFFORT`, `SPEC_TYPE`, what preflight checks (disk, RAM, backends) and how the model list shows it (`MODEL_TITLE`, `MODEL_ROLE`); `SERVER_ARGS` for flags no setting covers |
+| `models/{bonsai,qwen36-35b,qwen38-flash}.env` | Per `MODEL` (the environment, else `$QWEN_HOME/model.env` from `install.sh`, else `qwen36-35b`): the GGUF pin, the llama.cpp tree that runs it (`LLAMA_*`, `PATCH_DIR`), KV types, `EFFORT`, `SPEC_TYPE`, the vision projector (`MMPROJ_*`), what preflight checks (disk, RAM, backends) and how the model list shows it (`MODEL_TITLE`, `MODEL_ROLE`); `SERVER_ARGS` for flags no setting covers |
 | `models/trees/unsloth.env` | Unsloth's llama.cpp pin, sourced by both Qwen model files on CUDA since they share its build dir. Not a model: the model list reads `models/*.env` only |
 | `profiles/{model}/{dedicated,display}.env` | `CTX` and the four budget values, per model and GPU situation (`PROFILE`, default `dedicated`); for the MoE also `CPU_MOE` and `UB`. They constrain each other, so they move together |
 | `install.sh` | Step runner: `deps build model pi link`, all of them by default. Without `MODEL` and `model.env` it asks for the model by the RAM (on a terminal) and records it; then runs `preflight` |
@@ -42,7 +42,7 @@ incomplete, and a change that contradicts one needs a new measurement, not an ar
 **Two consumers, one config.** `config.env` feeds both the llama-server command line and, through
 `scripts/pi.sh`, a JSON config written into `PI_AGENT_DIR`. They drift silently: the server takes
 its values at start, pi keeps a written copy. After changing `CTX`, `SERVER_HOST`, `PORT`,
-`MAX_TOKENS`, `RESERVE_TOKENS` or `KEEP_RECENT_TOKENS`, `./install.sh pi` must run again, with the
+`MAX_TOKENS`, `RESERVE_TOKENS`, `KEEP_RECENT_TOKENS` or `VISION`, `./install.sh pi` must run again, with the
 same `MODEL`: each model has its own pi config dir.
 
 **The context budget is arithmetic, not taste.** `CTX`, `BUDGET`, `MAX_TOKENS`, `RESERVE_TOKENS`
@@ -112,7 +112,7 @@ Every fact has one home, chosen by how long it stays true.
 | `CONTRIBUTING.md` | — | the short human form of this file: the measurement rule, what gets declined |
 | `docs/dev.md` | durable | the index: which file holds which reason, and where each pre-split anchor went |
 | `docs/setup.md` | durable | build, toolchain, platforms, RAM and build memory, preflight, troubleshooting |
-| `docs/agent.md` | durable | pi, the context budget and its arithmetic, the agent prompt, the server lifecycle, Unsloth Studio |
+| `docs/agent.md` | durable | pi, the context budget and its arithmetic, the agent prompt, vision, the server lifecycle, Unsloth Studio |
 | `docs/agent-sessions.md` | durable | every Tron session, all models, one table plus each day's write-up. A new session is a row here |
 | `docs/{bonsai,qwen36,qwen38-flash}.md` | durable | one per `MODEL`: its pin and tree, why each of its settings, its speed, window and profiles. A new model gets its own |
 | `docs/performance.md` | durable | what limits generation speed: the bandwidth roofline, and the optimizations tried and rejected |

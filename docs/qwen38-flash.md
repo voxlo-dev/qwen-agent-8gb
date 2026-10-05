@@ -14,7 +14,7 @@ n-gram embedding table 26.8 GiB that is read lazily and does not limit speed, th
 the card. Every expert stays in RAM (`CPU_MOE` 48), read through the page cache. With 50 GB for
 WSL2 (`memory=50GB`, `autoMemoryReclaim=disabled` in `.wslconfig`, a 64 GB PC) the cache holds
 ~48 GB of the file and decode runs at ~10 tok/s; at 30 GB the SSD is in the loop and it drops to
-~6. `preflight` asks for 48 GB. On native Linux all 55.4 GiB fit, at ~19 tok/s, once ~58 GB are
+~6. `preflight` asks for 48 GB. On native Linux all 55.4 GiB fit, at ~19 tok/s, once ~59 GB are
 available before start: [below](#native-linux-every-expert-cached). And the card must drive no display: the profile fills it to
 7.39 GB, which is within reach only with the monitor on an iGPU (CUDA under WDDM reports 7 063 MiB
 free, but ~7.7 GB of buffers fit; past that Windows spills into shared memory without an error, and
@@ -127,9 +127,33 @@ cache held 51.9 GiB of them, and it cost twice:
 
 The prompt is the expensive part: with `--no-op-offload` it runs on the CPU and walks every
 expert, and a walk over a set just larger than the cache is the worst case of LRU, every page
-evicted shortly before it is needed again. Hence `MODEL_RAM_FULL_MB=58000` in the model file, and a
-preflight warning below it. Not tried: the BIOS carve-out at 512 MB, which would give 1.5 GiB of
+evicted shortly before it is needed again. Hence `MODEL_RAM_FULL_MB=59000` in the model file, and a
+preflight warning below it: the threshold lies between 58 150 MiB, which did not hold every expert
+([Vision](#vision)), and 59 250, which did. Not tried: the BIOS carve-out at 512 MB, which would give 1.5 GiB of
 margin, and `UD-Q3_K_XL` (experts 52.0 GiB), which is no longer needed.
+
+## Vision
+
+`mmproj-F16.gguf` from the pinned revision, on the CPU like for Qwen3.6
+([agent.md](agent.md#vision)); measured on 2026-10-05 (T-048, native, headless, the shipped 131k
+profile, 59 250 MiB available before start, `runs/T-048-vision/`). VRAM 7 592 MiB after requests
+with and without it. The cost is speed: the projector's ~0.85 GB idle plus its compute buffer
+come out of the page cache the experts live in. Three warm ~1.1k-token prompts, 256 tokens each:
+
+| | tg | pp |
+| --- | --- | --- |
+| without the projector | 18.6-18.7 | 93-95 |
+| with it | 17.4-17.6 | 78-85 |
+
+So 59 250 MiB hold every expert and the same less ~1.1 GB do not: the full-cache threshold sits
+between 58 150 and 59 250 MiB, hence `MODEL_RAM_FULL_MB=59000`. `preflight`
+adds `MMPROJ_RAM_MB` (1 100) to it with `VISION` on, so Flash sees at full speed from ~60 GB
+available; below that vision costs ~6 % of decode and ~12 % of prompt speed, until the BIOS
+carve-out above gives the margin back.
+
+At cap 512 it read both screens' state, the names, `GO!`, `DOUBLE KO!` and the buttons, placed the
+trails one above the other where they run side by side, and got one footer word wrong. Encode
+10.3 s; its own pass over the 476 image tokens 6-9 s more, on the CPU like any prompt.
 
 ## In an agent session
 

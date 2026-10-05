@@ -4,7 +4,7 @@
 # as the default model, the compaction budget, AGENTS.md, the pi-bg-bash extension from npm, and
 # the localagent extension with its workflow.
 # A global pi and ~/.pi stay untouched.
-# Re-run after changing CTX, SERVER_HOST, PORT, MAX_TOKENS, RESERVE_TOKENS or KEEP_RECENT_TOKENS.
+# Re-run after changing CTX, SERVER_HOST, PORT, MAX_TOKENS, RESERVE_TOKENS, KEEP_RECENT_TOKENS or VISION.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 has npm || die "npm not found - install Node.js >= 22.19 first"
@@ -27,7 +27,7 @@ log "writing pi config in $dir"
 
 DIR="$dir" SERVER_URL="$SERVER_URL" ALIAS="$MODEL_ALIAS" CTX="$CTX" MAX_TOKENS="$MAX_TOKENS" \
 RESERVE_TOKENS="$RESERVE_TOKENS" KEEP_RECENT_TOKENS="$KEEP_RECENT_TOKENS" \
-AGENT_ID="$AGENT_MODEL_ID" AGENT_BUDGET="$AGENT_BUDGET" AGENT_BUDGET_MSG="$AGENT_BUDGET_MSG" python3 - <<'PY'
+VISION="$VISION" AGENT_ID="$AGENT_MODEL_ID" AGENT_BUDGET="$AGENT_BUDGET" AGENT_BUDGET_MSG="$AGENT_BUDGET_MSG" python3 - <<'PY'
 import json, os
 d = os.environ["DIR"]
 
@@ -43,6 +43,9 @@ def save(name, data):
         json.dump(data, f, indent=2)
 
 models = load("models.json")
+# With the projector loaded, pi's read tool hands an image file to the model instead of a note
+# that the model cannot see it. See docs/agent.md#vision.
+inputs = ["text", "image"] if os.environ["VISION"] == "1" else ["text"]
 models.setdefault("providers", {})["local"] = {
     "api": "openai-completions",
     "baseUrl": os.environ["SERVER_URL"] + "/v1",
@@ -50,6 +53,7 @@ models.setdefault("providers", {})["local"] = {
     "models": [
         {
             "id": os.environ["ALIAS"],
+            "input": inputs,
             "contextWindow": int(os.environ["CTX"]),
             "maxTokens": int(os.environ["MAX_TOKENS"]),
         },
@@ -58,6 +62,7 @@ models.setdefault("providers", {})["local"] = {
         # reasoning_budget_tokens and reasoning_budget_message per request. See config.env.
         {
             "id": os.environ["AGENT_ID"],
+            "input": inputs,
             "contextWindow": int(os.environ["CTX"]),
             "maxTokens": int(os.environ["MAX_TOKENS"]),
             "samplingParams": {
@@ -81,7 +86,25 @@ settings.setdefault("compaction", {}).update(
 save("settings.json", settings)
 PY
 
-cp "$ROOT/pi/pi-agents.md" "$dir/AGENTS.md"
+# Of the two vision lines the one for VISION, without its tag: the model knows before it takes a
+# screenshot whether it can look at it. See docs/agent.md#vision.
+python3 - "$ROOT/pi/pi-agents.md" "$dir/AGENTS.md" "$VISION" <<'PY'
+import re, sys
+src, dst, vision = sys.argv[1:]
+out, keep = [], True
+for line in open(src).read().splitlines():
+    m = re.match(r"- \[vision=([01])\] (.*)", line)
+    if m:
+        keep = m.group(1) == vision
+        if keep:
+            out.append("- " + m.group(2))
+    elif line.startswith("  ") and out and not keep:
+        continue
+    else:
+        keep = True
+        out.append(line)
+open(dst, "w").write("\n".join(out) + "\n")
+PY
 log "wrote $dir/AGENTS.md"
 
 # Replaced whole, so an agent or template removed from the repo does not linger.

@@ -33,5 +33,10 @@ if [[ "$PRESERVE_THINKING" == "true" ]]; then
 else
   LOAD_FLAGS+=(--no-reasoning-preserve)
 fi
+# Vision: the projector stays on the CPU, so the profile's VRAM is untouched; the cap bounds the
+# encode time and what an image takes of the window. See docs/agent.md#vision.
+if [[ "$VISION" == 1 ]]; then
+  LOAD_FLAGS+=(--mmproj "$MMPROJ_PATH" --no-mmproj-offload --image-max-tokens "$IMAGE_MAX_TOKENS")
+fi
 if [[ -n "$SERVER_ARGS" ]]; then read -ra _extra <<<"$SERVER_ARGS"; LOAD_FLAGS+=("${_extra[@]}"); fi
 

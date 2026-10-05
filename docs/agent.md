@@ -194,6 +194,55 @@ health server to start and stop; `runs/bg-bash-qwen36/`):
   and a log file and polled with `sleep`; one attempt passed `background=true` as an environment
   variable. Hence the prompt line names the plain command, without `&` or `timeout`.
 
+## Vision
+
+A browser test checks the DOM; what a canvas shows only a picture tells. In B2
+([agent-sessions.md](agent-sessions.md#b2-qwen36)) Qwen3.6 saved Playwright screenshots and tried
+to look at them through `xxd` and `read`, on a server that serves text only. `VISION` gives it the
+picture: all three models ship a vision projector, and `VISION=1 ./install.sh model pi` puts the
+pinned one at `$QWEN_HOME/models/mmproj-$MODEL.gguf` (`MMPROJ_*` in the model file) and writes
+`"input": ["text", "image"]` into pi's `models.json`. pi's `read` then sends a PNG to the model,
+as a user message after the tool result, where it otherwise sends a note that the model cannot see
+it. The agent prompt says which of the two it is: pi's own prompt and `read`'s description are the
+same either way, so without a line a model takes screenshots it cannot look at, and finds out only
+from the note after the call. `pi/pi-agents.md` carries both lines, `install.sh pi` keeps the one
+for `VISION`. Once the projector is there `VISION` stays on, for `qwen-server` and every later `install.sh
+pi`; `VISION=0` turns it off, and like the window it has to reach both consumers: `./install.sh pi`
+after changing it.
+
+**On the CPU, so the profile is untouched.** `server-flags.sh` adds `--mmproj` with
+`--no-mmproj-offload`: the encoder (a ViT, `qwen3vl_merger` for all three) runs on the CPU
+backend, and no buffer of it lands on the card. Measured per model (T-048, 2026-10-05,
+`runs/T-048-vision/`): VRAM equal to the MiB, idle and after a request, with and without the
+projector. It costs RAM instead, the file plus a 248 MiB compute buffer, ~0.7-1.1 GB, which
+`preflight` adds to what the model holds (`MMPROJ_RAM_MB`). That matters for Qwen3.8-Flash only,
+whose experts need every GB of page cache ([qwen38-flash.md](qwen38-flash.md#vision)).
+
+**`IMAGE_MAX_TOKENS` 512.** A 1280x800 screenshot is 1 000 image tokens uncapped, and the encoder's
+time on the CPU grows faster than its tokens. Qwen3.6, F16 projector, 8 threads, the B2 game
+mid-round and its game-over screen, described with thinking off:
+
+| Cap | Image tokens | Encode, CPU | Read |
+| --- | --- | --- | --- |
+| 256 | 240 | 3.2 s | the game-over screen; the game screen not: `GO!` as `00`, the trails as paddles and a ball |
+| **512** | **476** | **10.0 s** | both screens, every name and state; the 10-pixel footer line half right |
+| 768 | 735 | 22.4 s | everything |
+| 1024, none | 1 000 | 43.1 s | everything |
+
+512 is the smallest cap that reads a game screen; a screen whose small print matters reads at
+`IMAGE_MAX_TOKENS=768` for twice the time. On top comes the model's own pass over the image
+tokens: 1.2-1.7 s for Qwen3.6, 0.6 s for Bonsai, 6-9 s for Flash, which reads prompts on the CPU.
+llama-server caches an image with the prompt, so a repeated request does not encode it again.
+
+**What it costs the window.** An image stays in the history like a file read, until a compaction:
+~480 tokens at 512 plus pi's line around it, so ten screenshots take ~5k of the budget's working
+room ([Context budget](#context-budget)). The cap is the lever, not the budget values.
+
+Through pi: a `pi -p` session against a stand-in server recorded the request pi builds for a
+`read` of the game screenshot, and replayed to `qwen-server` with the shipped flags, Qwen3.6
+answered from the picture: a Tron light-cycle game, both names, `GO!`, two trails heading for the
+centre (`runs/T-048-vision/mock.py`).
+
 ## Server lifecycle
 
 `qwen-pi` owns the server only when it started it. On start it checks `/health` on `PORT`;
@@ -270,8 +319,9 @@ instead of a bare llama-server: Studio's chat UI and API, this repo's build and 
   The window goes as `--context-length`, MTP as `--speculative-type mtp` or `off`, one slot as
   `--parallel 1` (Studio's default of 4 splits `CTX`), sampling as Studio's pinning options,
   because Studio owns those flags and refuses or rewrites them as raw arguments.
-- **Studio's own picks undone.** `--no-mmproj`, since no profile budgets VRAM for a vision
-  projector that Studio loads when it finds one beside the GGUF; `--load-mode auto`, because Studio
+- **Studio's own picks undone.** `--no-mmproj`: Studio picks a vision projector from beside the
+  GGUF on its own, where `$QWEN_HOME/models/` keeps every model's, and refuses `--mmproj` as a raw
+  argument, so [Vision](#vision) stays with `qwen-server` and Studio serves text; `--load-mode auto`, because Studio
   reads a model into memory (`none`) when it estimates it fits, and the experts in RAM are
   measured mmapped.
 
