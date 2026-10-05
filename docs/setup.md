@@ -113,7 +113,20 @@ Unsloth saw only the iGPU and installed CPU torch and the Vulkan llama.cpp build
 
 ## Windows
 
-**Native Windows is declined; WSL2 is the Windows path**, and it is the reference platform - every
+**Setting it up.** In PowerShell as administrator, `wsl --install -d Ubuntu`, reboot if it asks,
+then open Ubuntu and work entirely inside it:
+
+- **The NVIDIA driver belongs on the Windows side only.** WSL2 passes the GPU through; a Linux
+  NVIDIA driver inside Ubuntu breaks the passthrough. `nvidia-smi` inside Ubuntu must work before
+  anything else.
+- **Keep the repo in the Linux filesystem**, under `~`, not in `/mnt/c/`: building across the
+  boundary is several times slower.
+- **Give WSL2 the RAM the model needs.** It sees half the Windows RAM by default: raise `memory=`
+  in `%UserProfile%\.wslconfig`, then `wsl --shutdown`. Preflight checks it.
+- AMD cards under WSL2 are untested; use native Linux for the Vulkan backend. Both Qwen models are
+  30-50 % faster on native Linux than under WSL2 ([qwen36.md](qwen36.md#native-linux)).
+
+**Native Windows is declined; WSL2 is the Windows path**, and it was the reference platform - every
 CUDA number in these docs until 2026-09-29 was measured on Windows 11 + WSL2 + Ubuntu 26.04. So the question is not
 whether Windows works, it is whether a second implementation would be worth keeping.
 

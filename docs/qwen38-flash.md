@@ -1,11 +1,13 @@
-# Qwen3.8-Flash-Next, 125B (experimental)
+# Qwen3.8-Flash-Next, 125B
 
 `MODEL=qwen38-flash` serves [Qwen3.8-Flash-Next](https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF),
 the architecture mainline calls `qwen4exp`: 125B, 512 experts of which 10 are active, 48 layers
-(36 Gated DeltaNet, 12 sparse attention with a lightning indexer). A side experiment that matured,
-not a candidate for the default: at ~19 tok/s natively it is under half of Qwen3.6's speed, and it
-needs a machine few have. Measured for speed on one machine, and run in one agent session under
-WSL2, where it built the only game of the day whose rematch works ([agent-sessions.md](agent-sessions.md#d-qwen38-flash)).
+(36 Gated DeltaNet, 12 sparse attention with a lightning indexer). The strongest of the
+three models, for a 64 GB machine; not the default, because at ~19 tok/s natively it is under half
+of Qwen3.6's speed and needs a machine few have. Tested like the others since T-049 and T-043
+(2026-10-03/04): speed, its window filled to the edge, VRAM under `qwen-studio`, and three agent
+sessions, the first of which built the only game of its day whose rematch works
+([agent-sessions.md](agent-sessions.md#d-qwen38-flash)).
 
 **What it needs.** 87.2 GiB of `UD-IQ4_XS` on disk in three parts: routed experts 55.4 GiB, an
 n-gram embedding table 26.8 GiB that is read lazily and does not limit speed, the rest ~4.4 GiB on
