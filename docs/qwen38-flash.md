@@ -31,7 +31,8 @@ T-038 `build` compiles the same source itself into `llama.cpp-unsloth`: the sour
 `a3c12db` cannot be fetched from Unsloth's repository, so the pin is the release tarball the
 prebuilt was built from, with its sha256, and the result reports the same build 11160. Statically
 linked against the system's CUDA 12.9 like the other two trees, it needs nothing from Studio,
-but CCCL 3.2 instead of the toolkit's (below, *Filled*).
+but CCCL 3.2 instead of the toolkit's (below, *Filled*). The tree is also why this model is CUDA
+only: Unsloth's tree was never built or measured on Vulkan, and mainline did not get past 2.5k tokens of prefill.
 
 Measured against the prebuilt on 2026-10-02 (native Linux, headless, the same 131k buffers,
 interleaved built, prebuilt, built; `runs/T-038-unsloth-tree/`): VRAM 7 566 against 7 568 MiB,

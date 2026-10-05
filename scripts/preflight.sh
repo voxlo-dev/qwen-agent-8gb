@@ -46,7 +46,7 @@ fi
 # A model file names the backends it was measured on.
 case " $MODEL_BACKENDS " in
   *" $BACKEND "*) ;;
-  *) hard "model: MODEL=$MODEL is measured on ${MODEL_BACKENDS// /, } only, not $BACKEND - see docs/qwen36.md" ;;
+  *) hard "model: MODEL=$MODEL is measured on ${MODEL_BACKENDS// /, } only, not $BACKEND - see $MODEL_DOC" ;;
 esac
 
 # --- disk -------------------------------------------------------------------
