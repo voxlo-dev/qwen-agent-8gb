@@ -159,24 +159,40 @@ pi's per-project override and intended.
 
 pi reads providers from `models.json`. `contextWindow` decides when pi compacts, together with the settings under [Context budget](#context-budget) - not `maxTokens`, which is only the per-turn output cap. Unsloth's `unsloth start pi` hard-codes `maxTokens = min(context / 4, 8192)`, which cuts a single long reasoning turn off at 8k. That is why this setup uses its own config.
 
-### Tool timeout
+### Background tasks
 
 pi's bash tool has no default timeout: a call without one runs until it returns or someone
 presses Escape. A server started in the foreground, or a test that waits for a socket that never
 answers, holds the whole session. In the Tron sessions on the 4060 Ti machine that happened four
 times in 534 tool calls, all with Qwen3.8-Flash or Swift-Bonsai-2 (W, ES), each aborted by hand
 after 5-15 minutes, and each time the model needed a `Resume.` to go on. None of the calls that
-returned took longer than 3.8 minutes; the long ones were the models' own match simulations,
-mostly wrapped in a `timeout` of their own.
+returned took longer than 3.8 minutes.
 
-The `tool-timeout` extension (`pi/extensions/tool-timeout/`, installed by `install.sh pi`) gives
-every bash call that has no `timeout` the one in `TOOL_TIMEOUT`, 300 seconds by default; the
-model's own value is left alone. pi then kills the process tree and returns `Command timed out
-after 300 seconds` as a tool error, which the model reads like any other result and the session
-goes on. `qwen-pi` passes the value in the environment, so changing it needs no `install.sh pi`;
-`TOOL_TIMEOUT=0` turns it off. The agent prompt says so in one line, so a step that needs longer
-can ask for it. Not yet seen in a session: the value is from the timings above, not from a run
-with it.
+[pi-bg-bash](https://github.com/gvanderclay/pi-bg-bash) (pinned in `config.env`, installed by
+`install.sh pi` from its npm tarball) replaces pi's bash with the same tool plus a `background`
+flag, and adds `bash_output`, `bash_tasks` and `bash_kill`. A background call returns a task id at
+once; when the command exits, a message with its exit state and last lines arrives and starts a
+turn. A foreground call with no `timeout` of its own that is still running after 120 s becomes such
+a task, so a hung command no longer holds the session: the model reads that it moved and can stop
+it. Ending the session kills every task's process group, a `server &` left behind included. Its
+logs live in `~/.local/state/pi-bg/`, removed after 7 days. Cost: its tool descriptions add
+~2.7k characters, about 700 tokens, to every request.
+
+No default `timeout` is set on top of it: pi-bg-bash reads any `timeout` as the model's own, which
+turns the 120 s move off and makes a background task's deadline. The model's own values are left
+alone; Qwen3.6 sets one on most long commands.
+
+Two short Qwen3.6 sessions on 2026-10-05 (a 3-minute build, a failing and a hanging unit test, a
+health server to start and stop; `runs/bg-bash-qwen36/`):
+
+- Without a line in the agent prompt it never used the flag: the build ran as `& wait` under its
+  own 200 s timeout, the hanging test under its own 15 s, after which it deleted the test.
+- With the line, the hanging test run (no `timeout`) moved to the background at 120 s and the
+  model stopped it with `bash_kill` 3 s later, left the test file alone and said why it skipped
+  it. It used `background: true` for the server, but with `&` in the command, so the task ended at
+  once and the server lived on in its group until a `pkill`. The build it backgrounded with `&`
+  and a log file and polled with `sleep`; one attempt passed `background=true` as an environment
+  variable. Hence the prompt line names the plain command, without `&` or `timeout`.
 
 ## Server lifecycle
 

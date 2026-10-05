@@ -121,6 +121,5 @@ trap : INT
 status=0
 # The extensions read their limits from the environment, so config.env stays the source.
 export LOCALAGENT_MAX_TURNS="$AGENT_MAX_TURNS" LOCALAGENT_AGENT_MODEL="local/$AGENT_MODEL_ID"
-export QWEN_TOOL_TIMEOUT="$TOOL_TIMEOUT"
 PI_CODING_AGENT_DIR="$PI_AGENT_DIR" "$PI_BIN" "$@" 9>&- || status=$?
 exit "$status"

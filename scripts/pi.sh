@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: MIT
 # Installs the pinned pi into PI_PREFIX and writes its config into PI_AGENT_DIR: provider "local"
-# as the default model, the compaction budget, AGENTS.md, the tool-timeout extension, and the
-# localagent extension with its workflow.
+# as the default model, the compaction budget, AGENTS.md, the pi-bg-bash extension from npm, and
+# the localagent extension with its workflow.
 # A global pi and ~/.pi stay untouched.
 # Re-run after changing CTX, SERVER_HOST, PORT, MAX_TOKENS, RESERVE_TOKENS or KEEP_RECENT_TOKENS.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -92,8 +92,21 @@ cp "$ROOT"/pi/extensions/localagent/*.ts "$ext/"
 cp -r "$ROOT/pi/localagent-workflow" "$ext/workflow"
 log "wrote the localagent extension to $ext"
 
-ext="$dir/extensions/tool-timeout"
-rm -rf "$ext"
-mkdir -p "$ext"
-cp "$ROOT"/pi/extensions/tool-timeout/*.ts "$ext/"
-log "wrote the tool-timeout extension to $ext"
+# Its sources sit flat in the extension dir, since pi discovers a subdirectory by its index.ts.
+ext="$dir/extensions/pi-bg-bash"
+if [[ "$(cat "$ext/VERSION" 2>/dev/null)" == "$PI_BG_BASH_VERSION" ]]; then
+  log "pi-bg-bash $PI_BG_BASH_VERSION present"
+else
+  tmp="$(mktemp -d)"
+  trap 'rm -rf "$tmp"' EXIT
+  url="https://registry.npmjs.org/pi-bg-bash/-/pi-bg-bash-$PI_BG_BASH_VERSION.tgz"
+  curl -fsSL -o "$tmp/pkg.tgz" "$url" || die "could not download $url"
+  echo "$PI_BG_BASH_SHA256  $tmp/pkg.tgz" | sha256sum -c --quiet - \
+    || die "pi-bg-bash $PI_BG_BASH_VERSION does not match PI_BG_BASH_SHA256 - check the pin in config.env"
+  tar -xzf "$tmp/pkg.tgz" -C "$tmp"
+  rm -rf "$ext"
+  mkdir -p "$ext"
+  cp "$tmp"/package/src/*.ts "$tmp/package/LICENSE" "$ext/"
+  echo "$PI_BG_BASH_VERSION" > "$ext/VERSION"
+  log "wrote pi-bg-bash $PI_BG_BASH_VERSION to $ext"
+fi

@@ -228,7 +228,7 @@ reached the study's follow-up.
 - **The harness matters more than the model's tuning.** The author's reading over all sessions:
   the Swift fine-tune (W) moved little, while the harness moved a lot:
   Qwen3.6 works clearly better in pi than in OpenCode. The four hung tool calls (W, ES) are why
-  pi now gets a default bash timeout ([agent.md](agent.md#tool-timeout)).
+  pi now moves a hung command to the background ([agent.md](agent.md#background-tasks)).
 - **This test does not separate the candidates any more.** The outcome of one Tron session is
   close to chance: Bonsai built a working game in a first, undocumented run and never again,
   Qwen3.6 went from B's to B2's, Flash from D to E. A reproducible test is T-050.
