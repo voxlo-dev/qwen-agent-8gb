@@ -40,3 +40,6 @@ runs/
 # obj/
 
 # Domain-specific entries are added by project-initialiser.
+
+# Promotion material (LinkedIn cards), kept locally
+assets/
