@@ -222,6 +222,23 @@ decode. What only the T-016 patch still adds is the `mul_mm` loader: +40-50 % on
 compose without conflict (the patch needs `git am -3` on `842b188` for context in `types.glsl`).
 Polaris has no integer-dot instruction, so the `mul_mat_vecq` route is not available here.
 
+**#252 merged, and the patch is now the `mul_mm` loader alone (T-017, 2026-10-11).** #252 went
+in as `c53526a`; the pin is the release after it, `e8fd209` (`prism-b10772`). On the way the
+fork's #291 rewrote `dequant_ptq1_0.comp` the patch also rewrote, so the full patch no longer
+applied; rebased, and then cut to what still measures (`runs/T-017-e8fd209-rx570/`, same flags, 16k):
+
+| Build | generation | prompt, 847 tokens | `llama-bench` tg128 / pp512 |
+| --- | --- | --- | --- |
+| `e8fd209` | 141.1 ms/token | 40.3 tok/s | 7.15 / 43.2 |
+| + T-016 patch, rebased | 141.1 ms/token | 54.5 tok/s | 7.14 / 59.7 |
+| + `mul_mm` half only | 141.1 ms/token | 54.5 tok/s | 7.15 / 59.7 |
+
+`test-backend-ops` passes all three (157 + 83 + 4). Generation is #252's alone; our decode of
+`dequant_ptq1_0.comp` buys nothing over #291's, so the patch keeps the table, the packed block
+view and the `mul_mm` loader: +35 % on prompts. #291 also gives `mul_mat_vecq_ptq1_0` an
+emulated `DOT4` for cards without integer dot, but the host only creates those pipelines when
+the device reports `integer_dot_product`, so it does not reach the RX 570.
+
 **The environment is worth 1.76x on the shipped kernel, and getting it wrong looks like a kernel
 problem.** The first run, on Debian 13's Mesa 25.0.7 with clocks on `auto`, gave 0.94 tok/s.
 Three things moved it, measured one at a time at 16k:
@@ -266,9 +283,9 @@ Three things moved it, measured one at a time at 16k:
 (`qwen-pi -p`) and not for a conversation, which is why `vulkan` is
 supported and not the default. How the setup does it, all of it measured above:
 
-- `BACKEND=vulkan` builds the fork with `GGML_VULKAN=ON` and `patches/vulkan/` applied; the
-  pinned `LLAMA_COMMIT` does not carry the decode until upstream takes it (T-017). Same
-  binary flags otherwise, same KV types, same `-fa on`.
+- `BACKEND=vulkan` builds the fork with `GGML_VULKAN=ON` and `patches/vulkan/` applied: since
+  `e8fd209` the generation decode is the fork's own (#252), the patch carries only the `mul_mm`
+  loader for prompts (T-017). Same binary flags otherwise, same KV types, same `-fa on`.
 - `qwen-server` exports `RADV_PERFTEST=nogttspill` (1.22x; needs Mesa >= 25.2, `deps` warns
   below that), and `GGML_VK_DISABLE_HOST_VISIBLE_VIDMEM=1`. That one is neutral for Bonsai
   (143.81 vs 144.07 ms/token at 64k) and 2.3x on Qwen's repeated requests, whose checkpoint writes
@@ -278,8 +295,8 @@ supported and not the default. How the setup does it, all of it measured above:
 - The `dedicated` profile holds as is: 64k measured at 7 434 MiB of 8 192 on the RX 570,
   141.56 ms/token (`runs/T-016-ptq1_0-vulkan-decode/measure-new-64k.out`), so the window
   costs nothing here either and the pi budget is the same arithmetic.
-- `token_embd` stays on the CPU (265 MiB in GTT) and there is no Vulkan `mul_mat_vecq`; both
-  are fork work, neither is a setting.
+- `token_embd` stays on the CPU (265 MiB in GTT) and the integer-dot `mul_mat_vecq` is not
+  created on a card without integer dot; both are fork work, neither is a setting.
 
 Two side findings from the same runs, both harmless: `token_embd.weight` (ptq1_0) "cannot be used
 with preferred buffer type Vulkan_Host, using CPU instead", so 265 MiB stays CPU-mapped even at

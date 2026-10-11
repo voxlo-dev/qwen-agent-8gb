@@ -35,7 +35,7 @@ stays text only, and Flash's full-cache threshold is 59 GB.
 - [`T-045`](T-045-swift-bonsai-pin.md) Bonsai's pin to Swift-Bonsai-2 — the author's call after T-041 (W marginally better, nothing worse, a drop-in); the doc says it is not a measured win · chore · low · S
 - [`T-042`](T-042-display-profiles.md) The `display` profiles, checked once with a desktop on the card — all three are arithmetic or measured without one; Bonsai's largest `q8_0`/`q4_0` window; needs a monitor on the headless machine; merges T-008's display half · decision · medium · S
 - [`T-032`](T-032-docker-server-image.md) A Dockerfile for the server, not for pi — `llama-server` in a container, pi stays on the host through `SERVER_HOST`; answers the apt-toolchain problem off the host and nothing about drivers, VRAM or the profile · feature · medium · M
-- [`T-017`](T-017-upstream-ptq1_0-vulkan-patch.md) Upstream: a pin that makes the Vulkan patch, then the fork, unnecessary — comment on the fork's #185 posted, #252 matches the patch on generation; watch #252 and mainline #29077, then move the pin, re-measure both cards, drop what is no longer needed; merges T-029 · decision · medium · S
+- [`T-017`](T-017-upstream-ptq1_0-vulkan-patch.md) Upstream: a pin that makes the Vulkan patch, then the fork, unnecessary — #252 merged; pin `e8fd209` and the patch cut to its `mul_mm` half measured on the RX 570 (branch `t017-pin-e8fd209`), CUDA on the 4060 Ti open; then watch mainline; merges T-029 · decision · medium · S
 
 ## Open source (release checklist)
 

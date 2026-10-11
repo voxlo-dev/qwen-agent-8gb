@@ -182,5 +182,5 @@ The weights are their authors', under the licenses on their model cards, downloa
 time and never redistributed here. The model comparison and the localagent workflow come from a
 project thesis at Technische Hochschule Mittelhessen by this repo's author.
 
-**License: [MIT](LICENSE)**, including the `PTQ1_0` Vulkan decode in [`patches/vulkan`](patches/vulkan/),
+**License: [MIT](LICENSE)**, including the `PTQ1_0` Vulkan loader in [`patches/vulkan`](patches/vulkan/),
 which is offered upstream under the same terms.

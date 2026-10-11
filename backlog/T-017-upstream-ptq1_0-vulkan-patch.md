@@ -1,6 +1,6 @@
 # T-017 — Upstream: a pin that makes the Vulkan patch, and then the fork, unnecessary
 
-- **Summary:** Watch the fork (#185, #252) and mainline (ggml-org#29077) for a PTQ1_0 decode that makes `patches/vulkan/` unnecessary, and for mainline support that makes the fork pin unnecessary. Either event: move the pin, re-measure on both cards, drop what is no longer needed
+- **Summary:** Watch the fork (#185, #252) and mainline (ggml-org#29077, closed; now `bri-prism`'s PRs) for a PTQ1_0 decode that makes `patches/vulkan/` unnecessary, and for mainline support that makes the fork pin unnecessary. Either event: move the pin, re-measure on both cards, drop what is no longer needed
 - **Category:** decision
 - **Importance:** medium
 - **Effort:** S per event, waiting in between
@@ -24,6 +24,39 @@ Measured on the RX 570 (`runs/T-017-pr252-rx570/`, [bonsai.md](../docs/bonsai.md
 unique. Comment texts for #252 and the correction on #185 are in that run folder.
 `upstream-pr-body.md` and `upstream-commands.sh` in `runs/T-016-ptq1_0-vulkan-decode/` are the PR
 path, kept in case the decision is revisited.
+
+## Record
+
+- **2026-09-22:** mainline #29077 closed unmerged; the work continues as separate PRs by
+  `bri-prism` against ggml-org/llama.cpp. Watch those instead.
+- **2026-10-08:** #252 merged into `prism` as `c53526a`. #291 (2026-10-06) had rewritten
+  `dequant_ptq1_0.comp`, so the full patch no longer applied there.
+- **2026-10-11, RX 570 done** (`runs/T-017-e8fd209-rx570/`, [bonsai.md](../docs/bonsai.md#other-gpu-backends)):
+  at `e8fd209` (release `prism-b10772`) generation is 141.1 ms/token without the patch, prompts
+  40.3 tok/s; with the patch 54.5. Cut to the `mul_mm` half, exactly as fast as the full patch.
+  Branch `t017-pin-e8fd209`: the pin and the cut patch, one commit.
+
+`build.sh` keeps passing `GGML_CUDA_FA_ALL_QUANTS=ON`: at `e8fd209` it is deprecated but still
+maps to `GGML_CUDA_FA_QUANTS=all` (`ggml/cmake/common.cmake`), so the mixed `q8_0`/`q4_0` kernels
+stay. Unsloth's tree does not know the new flag, so the old one stays for both.
+
+**Open: the CUDA half on the 4060 Ti**, 66 fork commits between `1a07bfa` and `e8fd209`, CUDA
+among them (MMA FA with quantized V, the PTQ1 sm86 kernel, `GGML_FA_QUANTS` replacing
+`GGML_FA_ALL_QUANTS`). On the branch:
+
+```bash
+MODEL=bonsai FORCE=1 ./install.sh build    # a GGML_CUDA_FA_ALL_QUANTS deprecation warning is expected
+MODEL=bonsai qwen-server &                 # dedicated, 64k
+curl -s localhost:8080/v1/chat/completions -H 'Content-Type: application/json' \
+  -d '{"max_tokens":200,"messages":[{"role":"user","content":"Count from one to fifty in words."}]}' \
+  | python3 -c 'import sys,json; print(json.load(sys.stdin)["timings"])'
+nvidia-smi --query-gpu=memory.used --format=csv
+```
+
+Against: 36 tok/s generation at short context, 7 747 MiB at 64k; then the fill (one ~60 000-token
+prompt, `nvidia-smi` alongside): 396 tok/s read, 23.2 tok/s after it, 7 758-7 768 MiB with no
+growth (T-049). Same or better: merge the branch. Slower, or the fill grows: keep `1a07bfa` for
+CUDA and pin `e8fd209` for `BACKEND=vulkan` only, which `models/bonsai.env` can branch on.
 
 ## What, when it happens
 

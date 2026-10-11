@@ -1,47 +1,45 @@
-From 3a81c141779577b81c40b8679eee616b99705ee2 Mon Sep 17 00:00:00 2001
-From: voxlo-dev <leofemu@gmail.com>
-Date: Sun, 20 Sep 2026 09:01:49 -0400
-Subject: [PATCH] vulkan: decode PTQ1_0 through a byte-to-trits table and word
- loads
+From 4afd7b93646c4bab8858a1a177c11f8a7276e56d Mon Sep 17 00:00:00 2001
+From: voxlo-dev <125759415+voxlo-dev@users.noreply.github.com>
+Date: Sun, 11 Oct 2026 21:00:22 +0000
+Subject: [PATCH] vulkan: load PTQ1_0 into mul_mm through a byte-to-trits table
+ and word loads
 
-The PTQ1_0 shaders decoded every weight element on its own: one byte load, a
-three-way range branch and a loop of up to four dependent multiply-mask steps
-(v = (v*3) & 0xFF) to reach the wanted base-3 digit. Per 128-element block that
-is 128 byte loads and ~320 serial ALU ops, which is why the kernel ran ALU-bound
-at 1.6 tok/s on an RX 570 while Q4_K_M on the same card is bandwidth-bound (#185).
+The PTQ1_0 mul_mm loader decodes every weight on its own through
+ptq1_0_trit(): one byte load and a loop of up to four multiply-mask steps to
+reach the wanted base-3 digit, eight times per group. The dedicated mat-vec
+shader (#252) and the dequant rewrite (#291) fixed generation and dequant, but
+prompt processing still goes through this loader.
 
 Replace it with a 256-entry table, byte -> five trits, generated from the CPU
 codec in ggml-quants.c (q = (uint8_t)(b * 3^n); trit = (q * 3) >> 8) and stored
 as 2-bit two's-complement fields so a single bitfieldExtract yields the signed
 value. The table lives in shared memory and is filled by init_iq_shmem, the same
 mechanism the IQ grids use. The block is read through a new
-block_ptq1_0_packed32 (seven 32-bit words) so four or eight consecutive elements
-cost one or two word loads. The element -> byte mapping now lives in one place,
-ptq1_0_locate in ptq1_0.glsl, used by mul_mat_vec (dequantize/dequantize4),
-mul_mm (eight elements per group) and dequant_ptq1_0.comp.
+block_ptq1_0_packed32 (seven 32-bit words) so eight consecutive elements cost
+two word loads. The element -> byte mapping lives in ptq1_0_locate in
+ptq1_0.glsl, which the generic dequantize()/dequantize4() use as well.
 
 Bit-exact by construction: test-backend-ops -b Vulkan0 -p ptq1_0 passes for
-MUL_MAT, MUL_MAT_ID, GET_ROWS and CPY against the CPU backend, as before.
+MUL_MAT, MUL_MAT_ID and GET_ROWS against the CPU backend.
 
-Measured on Ternary-Bonsai-2-27B-PTQ1_0 (RX 570, RADV, Mesa 26.1.2,
-RADV_PERFTEST=nogttspill, clocks auto, q8_0/q4_0 KV, -fa on):
+Measured on Ternary-Bonsai-2-27B-PTQ1_0 at prism e8fd209 (RX 570, no integer
+dot, RADV, Mesa 26.1.2, RADV_PERFTEST=nogttspill, q8_0/q4_0 KV, -fa on, 16k):
 
-                     before      after
-  generation, 16k    633 ms/tok  143 ms/tok   (1.58 -> 7.0 tok/s)
-  generation, 48k    633 ms/tok  143 ms/tok
-  prompt, 847 tok    36 tok/s    54 tok/s
+                     e8fd209     + this
+  prompt, 847 tok    40.3 tok/s  54.5 tok/s
+  llama-bench pp512  43.2 tok/s  59.7 tok/s
+  generation         141 ms/tok  141 ms/tok   (unchanged, #252's shader)
 
-Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
 ---
  .../vulkan-shaders/dequant_funcs.glsl         |  7 +-
- .../vulkan-shaders/dequant_ptq1_0.comp        | 40 +++-----
  .../vulkan-shaders/mul_mm_funcs.glsl          | 12 ++-
  .../ggml-vulkan/vulkan-shaders/ptq1_0.glsl    | 98 ++++++++++++++-----
  .../src/ggml-vulkan/vulkan-shaders/types.glsl | 46 +++++++++
- 5 files changed, 143 insertions(+), 60 deletions(-)
+ 4 files changed, 130 insertions(+), 33 deletions(-)
 
 diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.glsl
-index 88be136..670d22e 100644
+index 0f33e2de..0fe2139d 100644
 --- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.glsl
 +++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.glsl
 @@ -130,13 +130,10 @@ vec4 dequantize4(uint ib, uint iqs, uint a_offset) {
@@ -60,69 +58,8 @@ index 88be136..670d22e 100644
  }
  #endif
  
-diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_ptq1_0.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_ptq1_0.comp
-index 53baf41..785df24 100644
---- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_ptq1_0.comp
-+++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_ptq1_0.comp
-@@ -5,35 +5,17 @@
- layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
- 
- layout (binding = 0) readonly buffer A {block_ptq1_0 data_a[];};
-+layout (binding = 0) readonly buffer A_PACKED32 {block_ptq1_0_packed32 data_a_packed32[];};
- layout (binding = 1) writeonly buffer D {D_TYPE data_b[];};
- 
--// One invocation per 8 elements: 16 invocations cover a 128-weight block. Element
--// order follows the CPU codec (16-byte qs chunk, 8-byte qs chunk, then qh), so the
--// index maths lives in one place rather than being reproduced per shader.
--float ptq1_0_trit_l(uint ib, uint e) {
--    uint b;
--    uint n;
--    if (e < 80u) {
--        b = uint(data_a[ib].qs[e & 15u]);
--        n = e >> 4u;
--    } else if (e < 120u) {
--        const uint t = e - 80u;
--        b = uint(data_a[ib].qs[16u + (t & 7u)]);
--        n = t >> 3u;
--    } else {
--        const uint t = e - 120u;
--        b = uint(data_a[ib].qh[t & 1u]);
--        n = t >> 1u;
--    }
--
--    uint v = b;
--    for (uint i = 0u; i < n; ++i) {
--        v = (v * 3u) & 0xFFu;
--    }
--    return float(int((v * 3u) >> 8u) - 1);
--}
-+#include "ptq1_0.glsl"
- 
-+// One invocation per 8 elements: 16 invocations cover a 128-weight block. Element
-+// order follows the CPU codec (16-byte qs chunk, 8-byte qs chunk, then qh); the
-+// index maths lives in ptq1_0.glsl rather than being reproduced per shader.
- void main() {
-+    init_iq_shmem(gl_WorkGroupSize);
-+
-     const uint i = gl_WorkGroupID.x * 4 + gl_LocalInvocationID.x / 64;
- 
-     const uint tid = gl_LocalInvocationID.x % 64;
-@@ -48,7 +30,11 @@ void main() {
- 
-     const float d = float(data_a[ib].d);
- 
--    [[unroll]] for (uint l = 0; l < 8; ++l) {
--        data_b[b_idx + l] = D_TYPE(ptq1_0_trit_l(ib, 8*il + l) * d);
-+    vec4 lo, hi;
-+    ptq1_0_dequant8(ib, 8*il, lo, hi);
-+
-+    [[unroll]] for (uint l = 0; l < 4; ++l) {
-+        data_b[b_idx + l]     = D_TYPE(lo[l] * d);
-+        data_b[b_idx + 4 + l] = D_TYPE(hi[l] * d);
-     }
- }
 diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_funcs.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_funcs.glsl
-index 3125a3f..18f30af 100644
+index 1f60af34..18558db3 100644
 --- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_funcs.glsl
 +++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_funcs.glsl
 @@ -161,12 +161,14 @@ void load_a_to_shmem(const uint pos_a, const uint row, const uint col, const uin
@@ -146,7 +83,7 @@ index 3125a3f..18f30af 100644
              const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
  
 diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/ptq1_0.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/ptq1_0.glsl
-index 7eedd83..5388810 100644
+index 7eedd832..5388810c 100644
 --- a/ggml/src/ggml-vulkan/vulkan-shaders/ptq1_0.glsl
 +++ b/ggml/src/ggml-vulkan/vulkan-shaders/ptq1_0.glsl
 @@ -1,38 +1,90 @@
@@ -264,7 +201,7 @@ index 7eedd83..5388810 100644
  
  #endif // PTQ1_0_GLSL
 diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/types.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/types.glsl
-index 469aad5..e5513c4 100644
+index f50742c8..a4fce551 100644
 --- a/ggml/src/ggml-vulkan/vulkan-shaders/types.glsl
 +++ b/ggml/src/ggml-vulkan/vulkan-shaders/types.glsl
 @@ -225,11 +225,57 @@ struct block_ptq1_0
@@ -324,7 +261,7 @@ index 469aad5..e5513c4 100644
 +}
  #endif
  
- #define QUANT_K_Q2_0 64
+ // PQ2_0: Prism Q2_0 at group 128 (same 2-bit codec, one fp16 scale per 128).
 -- 
 2.47.3
 
