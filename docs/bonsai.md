@@ -30,7 +30,7 @@ Architecture (`qwen35`): 64 blocks, every 4th is full attention (16 layers, 4 KV
 | KV cache, per 1k tokens, `q8_0`/`q8_0` | 34 |
 | KV cache, per 1k tokens, `q8_0`/`q4_0` | 26 |
 
-At 48k context with `q8_0`/`q4_0` the process holds ~7.3 GB of 8 GB. **64k is the default**: measured at 7 747 MiB of 8 188, 36 tok/s at short context and no layer on the CPU - 441 MiB to spare, which is why the GPU must drive no display. Filled with one 60 000-token prompt (T-049, 2026-10-03, headless): read at 396 tok/s, 23.2 tok/s after it, VRAM at 7 758-7 768 MiB throughout, no growth.
+At 48k context with `q8_0`/`q4_0` the process holds ~7.3 GB of 8 GB. **64k is the default**: measured at 7 755 MiB of 8 188, 39.6 tok/s at short context and no layer on the CPU - ~430 MiB to spare, which is why the GPU must drive no display. Filled with one 60 000-token prompt (T-017, 2026-10-14, fork `e8fd209`, headless): read at 677 tok/s, 24.5 tok/s after it, VRAM peaking at 7 779 MiB, no growth. The previous pin `1a07bfa` did 36.7, 396 and 23.2 in the same run ([below](#the-cuda-side-of-e8fd209)).
 
 **More than 64k only through the cache type**: 96k fits at `q4_0`/`q4_0` (18 MiB per 1k) and reads that depth cleanly, and nothing larger stays on the card. Under WSL2 a window that is too large does not fail to load. It spills into shared memory once the cache fills, and the VRAM reading does not show it. The measurements, and how to test a window at depth, are in [context-window.md](context-window.md). Qwen3.6, `MODEL=qwen36-35b`, has its own budget with the experts in RAM: [qwen36.md](qwen36.md).
 
@@ -238,6 +238,20 @@ applied; rebased, and then cut to what still measures (`runs/T-017-e8fd209-rx570
 view and the `mul_mm` loader: +35 % on prompts. #291 also gives `mul_mat_vecq_ptq1_0` an
 emulated `DOT4` for cards without integer dot, but the host only creates those pipelines when
 the device reports `integer_dot_product`, so it does not reach the RX 570.
+
+### The CUDA side of `e8fd209`
+
+The 66 fork commits between `1a07bfa` and `e8fd209` also touch CUDA (MMA flash attention with
+quantized V, a PTQ1_0 kernel for sm86+). Measured on the 4060 Ti, native Linux, `dedicated` 64k,
+both trees back to back (`runs/T-017-e8fd209-cuda/`, 2026-10-14):
+
+| Build | generation, greedy 256 tokens x3 | 60 000-token prompt | 64 tokens after it | VRAM loaded / peak |
+| --- | --- | --- | --- | --- |
+| `1a07bfa` | 36.7 tok/s | 396 tok/s | 23.2 tok/s | 7 771 / 7 781 MiB |
+| `e8fd209` | 39.6 tok/s | 677 tok/s | 24.5 tok/s | 7 755 / 7 779 MiB |
+
++8 % generation, +71 % on long prompts, the same VRAM, and the greedy continuation after 60 000
+tokens is identical between the two. So one pin for both backends.
 
 **The environment is worth 1.76x on the shipped kernel, and getting it wrong looks like a kernel
 problem.** The first run, on Debian 13's Mesa 25.0.7 with clocks on `auto`, gave 0.94 tok/s.
