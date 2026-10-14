@@ -17,7 +17,7 @@ in system RAM while the card holds the rest. More RAM, a bigger model:
 
 | RAM next to the card | Model | Speed | Window | Good for |
 | --- | --- | --- | --- | --- |
-| any | [Ternary-Bonsai-2-27B](https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-gguf), all on the card | 36 tok/s | 64k | small, well-scoped tasks |
+| any | [Ternary-Bonsai-2-27B](https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-gguf), all on the card | 40 tok/s | 64k | small, well-scoped tasks |
 | **32 GB** | **[Qwen3.6-35B-A3B](https://huggingface.co/Qwen/Qwen3.6-35B-A3B)** | **52-65 tok/s** | **131k** | **most work: fast, and the default** |
 | 64 GB | [Qwen3.8-Flash-Next](https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF), 125B | ~19 tok/s | 131k | the strongest, for when it may take longer |
 
@@ -67,11 +67,12 @@ Ryzen 7 7800X3D, 64 GB RAM:
 | --- | --- | --- | --- |
 | **Download and go**: the GGUF with default settings | ~4 | ~25 | ~4 |
 | **This repo's configuration**: the right llama.cpp tree, expert placement, KV cache, multi-token prediction; under WSL2 | 36 | 39-45 | 9-10 |
-| **Plus the system**: native Linux, no display on the card | 36.6 | **52-65** | **~19** |
+| **Plus the system**: native Linux, no display on the card | 39.6 | **52-65** | **~19** |
 
 The biggest single step after the configuration: **do not let this GPU drive your monitor.** A
 desktop takes 0.5-1.2 GB of VRAM and GPU time, both out of the model; plug the monitor into the
-mainboard's iGPU. If you cannot, `PROFILE=display` makes room. Where each number comes from:
+mainboard's iGPU. If you cannot, `PROFILE=display` makes room. Bonsai's WSL2 figure predates its
+current llama.cpp pin, which is 8 % faster on native Linux. Where each number comes from:
 [docs/performance.md](docs/performance.md) and the pages per model.
 
 ## Configure
@@ -105,9 +106,9 @@ Measured, each with a logged run:
 
 | Card | System | Qwen3.6 | Qwen3.8-Flash | Bonsai |
 | --- | --- | --- | --- | --- |
-| RTX 4060 Ti 8 GB | Linux Mint 22.3, native | 52-65 tok/s | ~19 tok/s | 36.6 tok/s |
+| RTX 4060 Ti 8 GB | Linux Mint 22.3, native | 52-65 tok/s | ~19 tok/s | 39.6 tok/s |
 | RTX 4060 Ti 8 GB | Windows 11 + WSL2, Ubuntu 26.04 | 39-45 tok/s | 9-10 tok/s | 36 tok/s |
-| AMD RX 570 8 GB | Debian 13, Vulkan (Mesa 26.1) | ~25 tok/s | - | 7 tok/s with this repo's Vulkan patch, 0.94 without |
+| AMD RX 570 8 GB | Debian 13, Vulkan (Mesa 26.1) | ~25 tok/s | - | 7 tok/s; this repo's Vulkan patch reads prompts 35 % faster |
 
 Expected to work, unmeasured: RTX 20xx to 40xx and RDNA2/3 cards with 8 GB or more; RTX 50xx needs
 CUDA >= 12.8. If you run one, a [hardware report](../../issues/new?template=hardware-report.yml) is
