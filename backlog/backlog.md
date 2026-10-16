@@ -7,7 +7,7 @@ Numbers have gaps: a closed ticket's file is deleted, and a ticket that is nobod
 is named `T-NNN-{slug}.local.md`, which `.gitignore` keeps out of the repo. The counter below never
 reuses a number either way.
 
-**Next ticket: `T-051`**
+**Next ticket: `T-053`**
 
 ## Draft
 
@@ -29,7 +29,11 @@ ticket file. T-043 closed on 2026-10-04: `qwen-studio` on the card costs neither
 (agent.md#unsloth-studio). T-048 closed on 2026-10-05: `VISION=1` loads each model's projector on the
 CPU, no VRAM, ~1 GB of RAM, ~10 s per screenshot at 512 image tokens (agent.md#vision); Studio
 stays text only, and Flash's full-cache threshold is 59 GB.
+T-051 closed on 2026-10-16: Qwen3.8-Flash's sparse attention ran dense at decode on a quantized
+cache; `patches/unsloth/` gathers the top-k, +27 % at 64k, +36 % at 110k (qwen38-flash.md#decode-at-depth);
+RAM bandwidth, thread pinning and the expert split in performance.md. T-052, the smaller quant, follows from it.
 
+- [`T-052`](T-052-flash-smaller-quant.md) Qwen3.8-Flash on a smaller quant — UD-IQ3_XXS predicted ~22-23 tok/s short (T-051's expert split), then UD-Q2_K_XL; KL against IQ4_XS and a Tron session for the tool calls before any pin moves · spike · medium · M
 - [`T-050`](T-050-reproducible-agent-test.md) A reproducible agent test in place of the single Tron session — fixed tasks with a checker, several runs per model, pass rate and time instead of one reading; harnesses comparable (pi, OpenCode); validates Sharp on Flash · spike · high · M
 - [`T-044`](T-044-qwen-for-8gb.md) Rebranding: Qwen for 8 GB VRAM — done in the repo on 2026-10-04; left: the GitHub rename `bonsai-agent-8gb` → `qwen-agent-8gb` and the remote, then a fresh clone on a 32 GB machine · feature · high · S
 - [`T-045`](T-045-swift-bonsai-pin.md) Bonsai's pin to Swift-Bonsai-2 — the author's call after T-041 (W marginally better, nothing worse, a drop-in); the doc says it is not a measured win · chore · low · S

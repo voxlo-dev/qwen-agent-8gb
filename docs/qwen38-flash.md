@@ -132,6 +132,111 @@ preflight warning below it: the threshold lies between 58 150 MiB, which did not
 ([Vision](#vision)), and 59 250, which did. Not tried: the BIOS carve-out at 512 MB, which would give 1.5 GiB of
 margin, and `UD-Q3_K_XL` (experts 52.0 GiB), which is no longer needed.
 
+## Decode at depth
+
+Decode falls with the depth, ~17 tok/s short to ~10 at 110k, and dense KV explains a fraction of
+it. Profiled (T-051, `nsys`, 2026-10-16), the GPU time per token grows from 22.9 ms short to 42.4
+at 64k, and three kernels hold the growth:
+
+| kernel, per token at 64k | short | 64k |
+| --- | --- | --- |
+| flash attention, 12 layers | 0.1 ms | 10.6 ms |
+| indexer: block scores expanded to cells (`get_rows`) | 0.1 ms | 4.2 ms |
+| indexer: raw keys gathered for pooling (`get_rows`, q8_0) | 0.0 ms | 2.3 ms |
+
+**The sparse attention is dense in cost at decode.** Unsloth's tree turns the indexer's top-k
+(2 048 tokens plus the tail block) into a -inf mask over the whole cache. Its CUDA flash attention
+can gather the top-k itself, in the MMA kernel, but only for f16 K/V: with a quantized cache that
+kernel would convert the whole cache to f16 per call, so a single query takes the vector kernel,
+which reads every cell. f16 KV at 64k (the VRAM of q8_0 at 131k) takes the gather with no code,
+12.75 tok/s at 64k against 11.67, at half the window.
+
+**The fix is two patches in [`patches/unsloth/`](../patches/unsloth/)**, applied by `build` to the
+tree both Qwen models share:
+
+1. `0001` (`qwen4exp.cpp`): at decode on a quantized cache, the top-k cells of K, V and the mask
+   row are gathered and attention runs over those, padded to 256. Every other case, prefill
+   included, keeps the masked path.
+2. `0002` (`ggml-cuda/getrows.cu`): rows shorter than the block share it. The score expansion is
+   n_kv rows of one float, which launched one 256-thread block per float. Generic, so Qwen3.6 runs
+   it too; `test-backend-ops -o GET_ROWS` 216/216.
+
+**Measured headless** (2026-10-16, `runs/T-051-flash-speed/final.sh`, MemAvailable 60.9 GB,
+`dedicated`, 131k `q8_0`/`q8_0`): one corpus prompt grown 32k → 64k → 110k, 128 tokens decoded at
+each depth, the same build with and without the patches:
+
+| decode tok/s | short (256-token turns) | 32k | 64k | 110k |
+| --- | --- | --- | --- | --- |
+| without the patches | 18.7-18.9 | 14.5 | 12.9 | 10.5 |
+| **with `0001` + `0002`** | **19.0-19.6** | **17.0** | **16.4** | **14.3** |
+| | +3 % | +17 % | +27 % | +36 % |
+
+Prefill unchanged (~98 tok/s at depth, 86-87 on a 5k prompt), VRAM unchanged (7 602 MiB peak in
+both), Qwen3.6 unchanged (57.0 / 64.3 / 54.6 against 57.1 / 64.4 / 54.6 tok/s). The SSD read
+0-0.3 GB per decode step.
+
+The profile behind the two patches, with a desktop open (the absolutes ~1.5 tok/s low and ±1):
+GPU time per token at 64k 42.4 ms without them, 33.5 with `0001`, 28.5 with both.
+
+The output: greedy decode is not deterministic run to run on this tree even without the patches
+(three runs, two variants of a ~5k-token summary); the patched runs give the same two, and at
+depth both builds continue the code plausibly and part after 150-400 characters. No KL measured.
+What is left at depth is the indexer pooling every block's keys again per token, ~2-3 ms at 64k:
+a cache of pooled keys, not a launch fix.
+
+## Strata, a dedicated engine
+
+[Strata](https://github.com/Niko1221/Strata) (MIT, 0.1.44.1 read on 2026-10-16) is an inference
+engine written for this model alone, with its own CUDA/HIP/Metal kernels and an OpenAI-compatible
+server. On cards of 12 GB and more it is far faster than llama.cpp: 53-94 tok/s on an RTX 5070
+with its own 2-3-bit quants, by its README. Its README asks for 12 GB of VRAM; its INSTALL says 8 GB runs, slowly. Read for T-051, to see what of it
+this setup could use. What it does, from its docs and source:
+
+- **A VRAM expert cache.** Experts ranked by an expert profile, swapped while a chat runs; what
+  misses is copied over PCIe or computed on the CPU. On this card 853 slots, 3.5 % of the 24 576
+  experts, served 20 and 55 % of the lookups in the two requests below.
+- **A page-locked RAM tier** (`--resident-budget-gib`). Pinning 37 GiB released the model's page
+  cache first. A 64 GB report of its own found the warm page cache faster than the
+  pinned budget for an IQ4_XS (5060 Ti 16 GB, `bench/results/2026-10-01-iq4xs-64gb`: 37.5-39 against
+26.7-27.5 tok/s), which is this repo's design.
+- **The route tail skip, on by default on CUDA since 0.1.42.** A missed expert that every token of
+  a verify window ranks 7-10 of its 10 is not computed, and the others are not renormalised. Its
+  own measurement for Unsloth's UD-Q4_K_XL: KL against Q8_0 from 0.056 to 0.086 with every expert
+  in RAM, 0.053 to 0.115 in the budget mode, for +4-10 % and +26-67 % decode (`docs/QUANTS.md`).
+  That is about a quant step: UD-IQ4_XS without it is 0.101. `STRATA_ROUTE_TAIL_SKIP=0` turns it off.
+- **MTP drafting**, the source of most of its speed on bigger cards. For Unsloth's files on cards
+  up to 9.5 GB its setup gives up, in this order, the KV in 8 bits, the window (8 192, 6 144,
+  4 608) and the draft layer (~0.8 GB), to leave room for the cache (`setup.py`,
+  `unsloth_small_card_plan`), and prints that UD files are very slow on such a card.
+- **Its own quants** (ISTA-DASLab's GSQ GGUFs, 2.3-3.3 bpw) with kernels for them. llama.cpp can
+  load them, but their Q2_0 has no x86 SIMD path (`ggml-cpu/arch-fallback.h`), so the CPU experts
+  would run scalar: not an option for this repo.
+
+**Measured on this machine** (2026-10-14, UD-IQ4_XS, the config its setup wrote: `--max-context
+8192`, `--resident-budget-gib 37`, no draft layer, tail skip on): two requests, 8 and 37 tokens
+out, 14.3 and 19.4 tok/s, 353 MiB of VRAM left, and on the first request 67 GB read from the SSD
+for 2.8 GB of experts. Too short to compare, and with the tail skip on not the same computation.
+This repo on the same file and card: 19.0-19.6 tok/s on 256-token turns, exact top-10 routing, at
+131k, 14.3 at 110k of depth.
+
+**As a server for pi** it would need two changes: a request whose prompt plus `max_tokens`
+exceeds the window gets a 400 unless `"fit_max_tokens": true` (pi sends 32 000, so at 8k every
+request fails), and the window itself. It also brings its own chat template, which pi's tool calls
+were not checked against.
+
+**The precedent that matters**: an RTX PRO 2000 Laptop 8 GB (Windows, Core Ultra 9 285H, 64 GB)
+ran Strata's GSQ IQ3_XXS at 262k with q4_0 KV streamed from RAM and MTP, ~29 tok/s over 2 717
+agent requests (`docs/PREFILL_HEAD_ALIAS.md`). That is faster than this repo, on a quant whose KL
+against Q8_0 Strata measures at 0.202 against UD-IQ4_XS's 0.101, with the tail skip, and on
+another machine.
+
+**What came of it**: nothing transfers by flag. Strata's per-expert cache, KV streaming and
+prefetch have no llama.cpp counterpart; `-ot` and `--n-cpu-moe` move whole layers, and one layer
+of experts (~1.15 GiB) does not fit beside a 131k window. The closest analogue of the tail skip,
+`--override-kv qwen4exp.expert_used_count=int:7`, is cruder (top-7 for every token, renormalised)
+and was used only as a probe ([performance.md](performance.md#qwen38-flash-experts-on-the-cpu)).
+Reading it pointed at the depth loss, which is where the patches above came from.
+
 ## Vision
 
 `mmproj-F16.gguf` from the pinned revision, on the CPU like for Qwen3.6

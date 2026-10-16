@@ -11,9 +11,9 @@ on 2026-10-03, T-047):
 | [agent-sessions.md](agent-sessions.md) | every Tron session across all models: the evidence for what each model is good for |
 | [bonsai.md](bonsai.md) | Bonsai: model format, VRAM budget, KV cache, reasoning, Swift-Bonsai-2, sampling, vision, Vulkan |
 | [qwen36.md](qwen36.md) | Qwen3.6-35B-A3B: why a MoE, the offload/MTP grid, profiles, RX 570, native Linux, the Unsloth tree, vision |
-| [qwen38-flash.md](qwen38-flash.md) | Qwen3.8-Flash-Next: every expert in RAM, flags, window, native Linux, vision |
+| [qwen38-flash.md](qwen38-flash.md) | Qwen3.8-Flash-Next: every expert in RAM, flags, window, native Linux, decode at depth and its patches, Strata, vision |
 | [context-window.md](context-window.md) | windows and KV quality for both models side by side |
-| [performance.md](performance.md) | Bonsai's bandwidth roofline, the optimizations tried and rejected |
+| [performance.md](performance.md) | Bonsai's bandwidth roofline, the optimizations tried and rejected; Qwen3.8-Flash's CPU experts |
 
 ## Old anchors
 

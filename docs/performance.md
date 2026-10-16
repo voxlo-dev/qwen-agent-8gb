@@ -5,7 +5,8 @@ optimizations were tried and rejected. [`dev.md`](dev.md) explains each shipped 
 this file explains the ceiling above them.
 
 Everything below was measured on the reference machine: RTX 4060 Ti 8 GB, WSL2, the pinned
-fork and model, `dedicated` profile (64k context, K `q8_0` / V `q4_0`).
+fork and model, `dedicated` profile (64k context, K `q8_0` / V `q4_0`); the last section, on
+Qwen3.8-Flash, natively.
 
 ## What the numbers actually are
 
@@ -201,6 +202,31 @@ speed setting at all**. A compaction costs a summarization call plus a full prom
 ~33k tokens, and prompt processing runs at 340-450 tok/s. Keeping the context budget right is
 worth more minutes than any decode tuning discussed here - see
 [Context budget](agent.md#context-budget).
+
+## Qwen3.8-Flash: experts on the CPU
+
+Everything above is Bonsai, fully on the card. Flash keeps its routed experts in system RAM and
+decodes at 18.7-19.6 tok/s short, natively with every expert cached
+([qwen38-flash.md](qwen38-flash.md#native-linux-every-expert-cached)). What limits it (T-051,
+2026-10-16, 7800X3D, 64 GB DDR5):
+
+- **RAM bandwidth is not the wall.** A read kernel over 2 GiB gets 60.2 GB/s at 8 threads, 57.0
+  at 16: the read limit of one Zen 4 CCD's Infinity Fabric link, so faster DIMMs or FCLK buy
+  little. The experts draw ~39 GB/s effective.
+- **The token splits ~31 ms CPU experts, ~27 ms the rest.** Overriding
+  `qwen4exp.expert_used_count` from 10 to 7 and 5 (a probe, it changes the output) gave +19 % and
+  +37 %, linear at ~3.1 ms per active expert: the CPU time scales with the expert bytes read, at
+  least with these IQ3_S/IQ4_NL kernels. Prompts scale too, 92 → 111 → 148 tok/s on a 5k prompt.
+- **Thread pinning does nothing.** `--cpu-mask 0xFF --cpu-strict 1`, with and without
+  `--poll 100`: inside the spread of two baseline runs.
+- **The depth loss was the attention, and is patched**: the sparse attention ran dense over the
+  cache at decode, +27 % at 64k and +36 % at 110k with `patches/unsloth/`
+  ([qwen38-flash.md](qwen38-flash.md#decode-at-depth)).
+
+**A smaller quant is the lever left for short decode.** From the GGUF headers and the split
+above: UD-IQ3_XXS (experts 45.3 GiB, 82 % of the bytes per token) predicts ~22-23 tok/s short,
+UD-Q2_K_XL (42.9 GiB) ~24, if their IQ2 kernels stay bandwidth-bound on 8 cores. Neither quality
+is measured for this model; that trial is T-052.
 
 ## Reproducing
 

@@ -75,6 +75,29 @@ mainboard's iGPU. If you cannot, `PROFILE=display` makes room. Bonsai's WSL2 fig
 current llama.cpp pin, which is 8 % faster on native Linux. Where each number comes from:
 [docs/performance.md](docs/performance.md) and the pages per model.
 
+Speed falls as the context fills. Qwen3.8-Flash holds 16.4 tok/s at 64k and 14.3 at 110k, up from
+12.9 and 10.5: Unsloth's tree ran the model's sparse attention densely over the whole cache, and
+two patches in [`patches/unsloth/`](patches/unsloth/) fix that
+([details](docs/qwen38-flash.md#decode-at-depth)).
+
+## And Strata?
+
+[Strata](https://github.com/Niko1221/Strata) is an engine written for Qwen3.8-Flash alone. **On a
+card with 12 GB or more, it is the faster choice:** 53-94 tok/s on an RTX 5070 by its own numbers.
+On an 8 GB card with the same GGUF, this repo is the better fit:
+
+| Same file (UD-IQ4_XS), same 8 GB card | this repo | Strata |
+| --- | --- | --- |
+| Window | 131k | 4.6-8k, chosen by its setup on a card this size |
+| Experts per token | all 10, exact | missed low-ranked experts skipped by default, about one quant step of accuracy by its own measurement |
+| Decode | 19.0-19.6 tok/s short, 14.3 at 110k | 14.3 and 19.4 on two short requests at 8k |
+| Coding agent | pi set up against it, the context budget measured | pi's requests are refused at that window until `fit_max_tokens` is set |
+
+Strata is faster on 8 GB in one setup: its own 3-bit quant, measured less accurate than this
+repo's, ran an 8 GB laptop at ~29 tok/s with a 262k window. Nothing of Strata's transfers to
+llama.cpp by a flag, but reading it found the dense attention above. The full comparison:
+[docs/qwen38-flash.md](docs/qwen38-flash.md#strata-a-dedicated-engine).
+
 ## Configure
 
 Each model has two profiles: `dedicated` (default) for a card that drives no display, `display`
