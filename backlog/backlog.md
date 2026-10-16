@@ -7,7 +7,7 @@ Numbers have gaps: a closed ticket's file is deleted, and a ticket that is nobod
 is named `T-NNN-{slug}.local.md`, which `.gitignore` keeps out of the repo. The counter below never
 reuses a number either way.
 
-**Next ticket: `T-053`**
+**Next ticket: `T-054`**
 
 ## Draft
 
@@ -32,6 +32,8 @@ stays text only, and Flash's full-cache threshold is 59 GB.
 T-051 closed on 2026-10-16: Qwen3.8-Flash's sparse attention ran dense at decode on a quantized
 cache; `patches/unsloth/` gathers the top-k, +27 % at 64k, +36 % at 110k (qwen38-flash.md#decode-at-depth);
 RAM bandwidth, thread pinning and the expert split in performance.md. T-052, the smaller quant, follows from it.
+T-053 closed on 2026-10-16 without a ticket file: the Unsloth pin moved to b11681-mix (upstream's QSA
+rewrite, Unsloth's get_rows fix, no CCCL fetch), the decode gather ported, tested and not benchmarked.
 
 - [`T-052`](T-052-flash-smaller-quant.md) Qwen3.8-Flash on a smaller quant — UD-IQ3_XXS predicted ~22-23 tok/s short (T-051's expert split), then UD-Q2_K_XL; KL against IQ4_XS and a Tron session for the tool calls before any pin moves · spike · medium · M
 - [`T-050`](T-050-reproducible-agent-test.md) A reproducible agent test in place of the single Tron session — fixed tasks with a checker, several runs per model, pass rate and time instead of one reading; harnesses comparable (pi, OpenCode); validates Sharp on Flash · spike · high · M

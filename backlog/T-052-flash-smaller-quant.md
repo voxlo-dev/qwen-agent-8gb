@@ -4,7 +4,7 @@
 - **Category:** spike
 - **Importance:** medium
 - **Effort:** M
-- **Depends on:** T-051 (closed): its patches are in the build either quant runs on
+- **Depends on:** T-051 and T-053 (closed): the b11681 pin and its decode patch are the build either quant runs on
 
 ## Why
 

@@ -21,7 +21,7 @@ free, but ~7.7 GB of buffers fit; past that Windows spills into shared memory wi
 speed collapses).
 
 **Unsloth's llama.cpp, not mainline.** The sparse attention is the reason. Unsloth's tree
-(b11160) runs it with a banded flash-attention kernel over the selected blocks. Mainline
+(b11160, then) gathered the selected blocks for prefill in its MMA flash-attention kernel. Mainline
 `8212c78`, and master of 2026-09-29, builds a full mask and runs dense flash attention, which
 takes VRAM at runtime outside the reserved buffers: with the same 7 386 MiB loaded it died twice at
 ~2.5k tokens of prefill (`CUDA error: device not ready` in the VMM pool), where Unsloth's tree ran
@@ -31,7 +31,10 @@ T-038 `build` compiles the same source itself into `llama.cpp-unsloth`: the sour
 `a3c12db` cannot be fetched from Unsloth's repository, so the pin is the release tarball the
 prebuilt was built from, with its sha256, and the result reports the same build 11160. Statically
 linked against the system's CUDA 12.9 like the other two trees, it needs nothing from Studio,
-but CCCL 3.2 instead of the toolkit's (below, *Filled*). The tree is also why this model is CUDA
+but CCCL 3.2 instead of the toolkit's (below, *Filled*). Since T-053 (2026-10-16) the pin is
+b11681-mix, upstream b11681 with Unsloth's PRs, which carries upstream's rewrite of this model
+([Decode at depth](#decode-at-depth)) and its own radix top-k: no CCCL fetch, the 110k fill flat at
+7 707-7 750 MiB, ~140 MiB above b11160. The tree is also why this model is CUDA
 only: Unsloth's tree was never built or measured on Vulkan, and mainline did not get past 2.5k tokens of prefill.
 
 Measured against the prebuilt on 2026-10-02 (native Linux, headless, the same 131k buffers,
@@ -68,7 +71,7 @@ to the end of the card. An agent's prompts are mostly a few hundred tokens or on
 the sessions got further. The prebuilt is CUDA 13.3 and never took that path; T-038 compared VRAM
 at load, where the pool is empty, and the deepest earlier run was 31k.
 
-`LLAMA_CMAKE_ARGS=-DGGML_CUDA_CUB_3DOT2=ON` in the model file: the tree's own switch, which
+On b11160 the fix was `LLAMA_CMAKE_ARGS=-DGGML_CUDA_CUB_3DOT2=ON`: the tree's own switch, which
 fetches CCCL v3.2.0 at build time (a git tag, not checksummed) and keeps the system's 12.9. The
 same 110k prompt then reads through without error: VRAM flat at 7 592-7 594 MiB from 0 to 110k,
 the prompt at 97 tok/s on average, 64 tokens after it at 9.7 tok/s. CUDA 13 is not needed for
@@ -134,9 +137,9 @@ margin, and `UD-Q3_K_XL` (experts 52.0 GiB), which is no longer needed.
 
 ## Decode at depth
 
-Decode falls with the depth, ~17 tok/s short to ~10 at 110k, and dense KV explains a fraction of
-it. Profiled (T-051, `nsys`, 2026-10-16), the GPU time per token grows from 22.9 ms short to 42.4
-at 64k, and three kernels hold the growth:
+Decode falls with the depth, ~17 tok/s short to ~10 at 110k on the b11160 pin, and dense KV
+explains a fraction of it. Profiled (T-051, `nsys`, 2026-10-16, b11160), the GPU time per token
+grows from 22.9 ms short to 42.4 at 64k, and three kernels hold the growth:
 
 | kernel, per token at 64k | short | 64k |
 | --- | --- | --- |
@@ -151,17 +154,13 @@ kernel would convert the whole cache to f16 per call, so a single query takes th
 which reads every cell. f16 KV at 64k (the VRAM of q8_0 at 131k) takes the gather with no code,
 12.75 tok/s at 64k against 11.67, at half the window.
 
-**The fix is two patches in [`patches/unsloth/`](../patches/unsloth/)**, applied by `build` to the
-tree both Qwen models share:
+**The fix, on b11160, was two patches**: `0001` (`qwen4exp.cpp`) gathered the top-k cells of K, V
+and the mask row at decode on a quantized cache and attended over those, padded to 256, every other
+case, prefill included, keeping the masked path; `0002` (`ggml-cuda/getrows.cu`) let rows shorter
+than the block share it, since the score expansion was n_kv rows of one float, one 256-thread
+block each (`test-backend-ops -o GET_ROWS` 216/216). Both are in the git history (T-051).
 
-1. `0001` (`qwen4exp.cpp`): at decode on a quantized cache, the top-k cells of K, V and the mask
-   row are gathered and attention runs over those, padded to 256. Every other case, prefill
-   included, keeps the masked path.
-2. `0002` (`ggml-cuda/getrows.cu`): rows shorter than the block share it. The score expansion is
-   n_kv rows of one float, which launched one 256-thread block per float. Generic, so Qwen3.6 runs
-   it too; `test-backend-ops -o GET_ROWS` 216/216.
-
-**Measured headless** (2026-10-16, `runs/T-051-flash-speed/final.sh`, MemAvailable 60.9 GB,
+**Measured headless on b11160** (2026-10-16, `runs/T-051-flash-speed/final.sh`, MemAvailable 60.9 GB,
 `dedicated`, 131k `q8_0`/`q8_0`): one corpus prompt grown 32k → 64k → 110k, 128 tokens decoded at
 each depth, the same build with and without the patches:
 
@@ -181,8 +180,24 @@ GPU time per token at 64k 42.4 ms without them, 33.5 with `0001`, 28.5 with both
 The output: greedy decode is not deterministic run to run on this tree even without the patches
 (three runs, two variants of a ~5k-token summary); the patched runs give the same two, and at
 depth both builds continue the code plausibly and part after 150-400 characters. No KL measured.
-What is left at depth is the indexer pooling every block's keys again per token, ~2-3 ms at 64k:
-a cache of pooled keys, not a launch fix.
+What was left at depth was the indexer pooling every block's keys again per token, ~2-3 ms at 64k.
+
+**On the b11681 pin (T-053)** upstream had rebuilt the path meanwhile (ggml-org #29751 and its
+follow-ups, 2026-10-01 to 10-14): pooled keys kept per block in the cache, the top-k taken over
+blocks, the indexer one fused op. That removes the second and third rows of the profile and
+`0002`'s case; Unsloth's own `get_rows` change (unslothai #264) is in the release too. The first row
+stays: the CUDA kernel choice is unchanged upstream, so on a quantized cache a single query still
+runs over every cell. [`patches/unsloth/0001`](../patches/unsloth/) is `0001` ported: `build_qsa_sel`
+keeps the selected cells, clamped into the cache, with a -1e30 bias on its dead slots (padded pools,
+missing tail cells, invisible pools that may repeat a live cell), and `build_attn_qsa` gathers them.
+Tested, not benchmarked (`runs/T-053-unsloth-b11681/`, a desktop open, 0.5 GB from the SSD per
+step): the tool call through the chat API, the 110k fill flat at 7 707-7 749 MiB, and 32 tokens
+after it at 14.2 tok/s against 11.05 on the same pin without the patch. A ~5k-token summary matches
+the unpatched build for 537 characters and parts in a clause both builds have produced before.
+
+The same CUDA kernel choice is in ggml-org master as of 2026-10-16: whether upstream wants the
+gather is open. Earlier attempts at the same fix, before the rewrite: unslothai #165 (open since
+2026-08-31) and ggml-org #28130 (closed by the contribution bot).
 
 ## Strata, a dedicated engine
 

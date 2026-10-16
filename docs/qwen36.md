@@ -28,7 +28,7 @@ tokens at `q8_0`/`q8_0`, against Bonsai's 34.
 | --- | --- |
 | Model | `unsloth/Qwen3.6-35B-A3B-MTP-GGUF` rev `5bc3e238d916f48a861bac2f8a1990a0e9b7e98d`, `Qwen3.6-35B-A3B-UD-Q4_K_M.gguf`, 22 663 387 424 bytes |
 | sha256 | `0b21525e972670ed59e1812e170b27c26355381f0656ecc4e25617ece7dac58b` |
-| llama.cpp, CUDA | Unsloth's b11160, source `a3c12db9dfc9a5bdf93df199ec370e9faf117c69` from its release tarball, in `$QWEN_HOME/llama.cpp-unsloth`, shared with Qwen3.8-Flash ([why](#one-tree-for-both-qwen-models)) |
+| llama.cpp, CUDA | Unsloth's b11681-mix, source `57bf43afe8a9981e33fcfc11a755bcee2b775d2d` from its release tarball, in `$QWEN_HOME/llama.cpp-unsloth`, shared with Qwen3.8-Flash ([why](#one-tree-for-both-qwen-models)); measured below on b11160 |
 | llama.cpp, Vulkan | mainline, ggml-org `8212c7802455255460ab8e18fc34754560031b34` (2026-09-24), in `$QWEN_HOME/llama.cpp-mainline`; everything below was measured on it |
 
 The `-MTP-` repo carries the same weights as `unsloth/Qwen3.6-35B-A3B-GGUF` plus one MTP layer
@@ -97,7 +97,9 @@ shipped config at 7 374 MiB, ~480 below the edge ([context-window.md](context-wi
 110 000-token prompt in 2048-token ubatches read at 772 tok/s, 64 tokens after it at 36.4 tok/s,
 VRAM at 7 360-7 374 MiB throughout, no growth. Qwen3.6 has no sparse attention and never took
 the top-k path that ran Flash out of the card ([qwen38-flash.md](qwen38-flash.md)); the build
-flag is for Flash and costs this model nothing measurable.
+flag is for Flash and costs this model nothing measurable. On b11681 (T-053, tested, not
+benchmarked): the same 110k fill at 827 tok/s, 32 tokens after it at 39.8, VRAM 7 303-7 379 MiB,
+a tool call through the chat API with MTP drafting (51 of 75 accepted).
 
 **Thinking in the prompt** behaves as with Bonsai: `--reasoning-preserve` renders every earlier
 thinking block, `--no-reasoning-preserve` only those after the last user message. Mainline has the

@@ -220,7 +220,7 @@ decodes at 18.7-19.6 tok/s short, natively with every expert cached
 - **Thread pinning does nothing.** `--cpu-mask 0xFF --cpu-strict 1`, with and without
   `--poll 100`: inside the spread of two baseline runs.
 - **The depth loss was the attention, and is patched**: the sparse attention ran dense over the
-  cache at decode, +27 % at 64k and +36 % at 110k with `patches/unsloth/`
+  cache at decode, +27 % at 64k and +36 % at 110k with `patches/unsloth/` (on b11160)
   ([qwen38-flash.md](qwen38-flash.md#decode-at-depth)).
 
 **A smaller quant is the lever left for short decode.** From the GGUF headers and the split

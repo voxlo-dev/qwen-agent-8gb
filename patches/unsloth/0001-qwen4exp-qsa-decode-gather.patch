@@ -1,54 +1,99 @@
-From c3c8d87cb137cf0a6a092c2c88c9d1de222bc991 Mon Sep 17 00:00:00 2001
+From 15fe5cd38e35b86a17de8a6c6e0c1a967a78e1c6 Mon Sep 17 00:00:00 2001
 From: voxlo-dev <125759415+voxlo-dev@users.noreply.github.com>
-Date: Fri, 16 Oct 2026 17:17:30 +0200
-Subject: [PATCH 1/2] qwen4exp: attend over the gathered top-k cells at decode
- on a quantized cache
+Date: Fri, 16 Oct 2026 19:17:33 +0200
+Subject: [PATCH] qwen4exp: attend over the selected cells at decode on a
+ quantized cache
 
-build_attn_qsa turns the indexer's top-k into a -inf mask over the whole
-cache and runs flash attention over every cell. For a single query on a
-quantized cache the CUDA backend picks the vector kernel, which reads all
-n_kv cells per token: the MMA kernel's own sparse gather only applies to
-f16 K/V, since it would convert the whole cache to f16 first.
+build_qsa_sel turns the selected blocks and the tail into an additive mask
+over every cell, and build_attn_qsa runs flash attention over the whole
+cache with it. For a single query on a quantized cache the CUDA backend
+takes the vector kernel, which reads all n_kv cells per token: the MMA
+kernel's sparse gather, which n_sel enables, applies to f16 K/V only,
+since it would convert the whole cache to f16 first.
 
 At decode (one token, one stream, flash attention on, a quantized K or V,
-top-k padded to 256 below n_kv), get_rows the top-k cells of K, V and the
-query's mask row, pad to a whole FATTN_KQ_STRIDE with zero cells masked
--inf, and attend over those. Every other case takes the masked path as
-before.
+n_sel padded to 256 below n_kv), keep the selected cells from
+build_qsa_sel, clamped into the cache, with a -1e30 bias on the dead
+slots (padded pools, missing tail cells, invisible pools that may repeat a
+live cell); get_rows those cells of K, V and the query's row of the
+selection mask, pad to a whole FATTN_KQ_STRIDE with zero cells masked
+-inf, and attend over them. Every other case keeps the masked path.
 
-Qwen3.8-Flash-Next UD-IQ4_XS, RTX 4060 Ti 8 GB, q8_0/q8_0 at 131k: flash
-attention per token at 64k of depth 10.6 -> ~0.3 ms, GPU time per token
-42.4 -> 33.5 ms, decode 11.7 -> 13.1 tok/s. Prefill unchanged.
+The same change on b11160 (Qwen3.8-Flash-Next UD-IQ4_XS, RTX 4060 Ti
+8 GB, q8_0/q8_0 at 131k): decode 12.9 -> 16.4 tok/s at 64k of depth,
+10.5 -> 14.3 at 110k.
 ---
- src/models/qwen4exp.cpp | 51 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 51 insertions(+)
+ src/models/models.h     |  6 ++++
+ src/models/qwen4exp.cpp | 62 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 68 insertions(+)
 
+diff --git a/src/models/models.h b/src/models/models.h
+index 7e2c376..64abbb6 100644
+--- a/src/models/models.h
++++ b/src/models/models.h
+@@ -2732,6 +2732,12 @@ struct llama_model_qwen4exp : public llama_model_base {
+                             int * sections,
+                             int   il);
+ 
++        // decode: the cells build_qsa_sel selected for the mask qsa_gather_sel, clamped into the cache,
++        // and a bias of -1e30 on the dead slots, for the gather in build_attn_qsa
++        ggml_tensor * qsa_gather_sel  = nullptr;
++        ggml_tensor * qsa_gather_idx  = nullptr;
++        ggml_tensor * qsa_gather_bias = nullptr;
++
+         ggml_tensor * build_layer_attn_linear(
+              llm_graph_input_rs * inp,
+                     ggml_tensor * cur,
 diff --git a/src/models/qwen4exp.cpp b/src/models/qwen4exp.cpp
-index 79801e3..0b0440b 100644
+index 5b3e31d..2808284 100644
 --- a/src/models/qwen4exp.cpp
 +++ b/src/models/qwen4exp.cpp
-@@ -949,6 +949,57 @@ ggml_tensor * llama_model_qwen4exp::graph::build_attn_qsa(
- 
-     ggml_tensor * kq_mask = inp->get_kq_mask();
- 
-+    // decode on a quantized cache: gather the top-k cells and attend over those alone. The masked
-+    // path below reads every cell of the cache per token (the vector kernel takes it for a single
-+    // query), and the MMA kernel's own sparse gather needs f16: it converts the whole cache first.
-+    {
-+        ggml_tensor * k = mctx_cur->get_k(ctx0, il);
-+        ggml_tensor * v = mctx_cur->get_v(ctx0, il);
+@@ -857,6 +857,16 @@ ggml_tensor * llama_model_qwen4exp::graph::build_qsa_sel(
+     // dump rows n_kv + slot as a cumulative sum: the meta backend cannot split an arange, which has no source
+     ggml_tensor * dump  = ggml_scale_bias(ctx0, ggml_cumsum(ctx0, ggml_fill(ctx0, live, 1.0f)), 1.0f, (float) (n_kv - 1));
+     ggml_tensor * idx_f = ggml_cast(ctx0, sel_idx, GGML_TYPE_F32);
 +
++    // a single query can attend over the selected cells alone: keep them, clamped into the cache, with a
++    // bias that drops the dead slots (they may repeat a live cell); not computed unless build_attn_qsa uses it
++    ggml_tensor * gather_idx  = nullptr;
++    ggml_tensor * gather_bias = nullptr;
++    if (n_tokens == 1) {
++        gather_idx  = ggml_cast(ctx0, ggml_clamp(ctx0, idx_f, 0.0f, (float) (n_kv - 1)), GGML_TYPE_I32);
++        gather_idx  = ggml_reshape_1d(ctx0, gather_idx, n_sel);
++        gather_bias = ggml_reshape_1d(ctx0, ggml_scale_bias(ctx0, live, 1e30f, -1e30f), n_sel);
++    }
+     idx_f   = ggml_add(ctx0, ggml_mul(ctx0, ggml_sub(ctx0, idx_f, dump), live), dump);
+     sel_idx = ggml_cast(ctx0, idx_f, GGML_TYPE_I32);
+ 
+@@ -869,6 +879,10 @@ ggml_tensor * llama_model_qwen4exp::graph::build_qsa_sel(
+     sel = ggml_add(ctx0, sel, kq_mask);
+     cb(sel, "indexer_sel", il);
+ 
++    qsa_gather_sel  = gather_idx ? sel : nullptr;
++    qsa_gather_idx  = gather_idx;
++    qsa_gather_bias = gather_bias;
++
+     return sel;
+ }
+ 
+@@ -920,6 +934,54 @@ ggml_tensor * llama_model_qwen4exp::graph::build_attn_qsa(
+     ggml_tensor * k = mctx_cur->get_k(ctx0, il);
+     ggml_tensor * v = mctx_cur->get_v(ctx0, il);
+ 
++    // decode on a quantized cache: gather the selected cells and attend over those alone. With the
++    // mask over every cell, a single query takes the CUDA vector kernel, which reads all of them; the
++    // MMA kernel's own sparse gather needs f16 K/V, since it converts the whole cache first.
++    {
 +        const int64_t n_kv  = k->ne[2];
-+        const int64_t n_sel = top_k->ne[0];
 +        const int64_t n_pad = GGML_PAD(n_sel, 256); // FATTN_KQ_STRIDE: the vector kernel takes whole strides
 +
 +        const bool v_trans = v->nb[1] > v->nb[2];
-+        const bool gather  = cparams.flash_attn && q_cur->ne[2] == 1 && k->ne[3] == 1 && !v_trans &&
-+            (ggml_is_quantized(k->type) || ggml_is_quantized(v->type)) && n_pad < n_kv &&
++        const bool gather  = qsa_gather_sel == sel && cparams.flash_attn && q_cur->ne[2] == 1 && k->ne[3] == 1 &&
++            !v_trans && (ggml_is_quantized(k->type) || ggml_is_quantized(v->type)) && n_pad < n_kv &&
 +            k->nb[2] == k->ne[1]*k->nb[1] && v->nb[2] == v->ne[1]*v->nb[1];
 +
 +        if (gather) {
-+            ggml_tensor * idx = ggml_reshape_1d(ctx0, top_k, n_sel);
++            ggml_tensor * idx = qsa_gather_idx;
 +
 +            // one cache cell per row, dequantized to f32 by get_rows; the padding rows are zero and masked
 +            auto gather_cells = [&](ggml_tensor * t) {
@@ -61,9 +106,10 @@ index 79801e3..0b0440b 100644
 +                return ggml_reshape_4d(ctx0, rows, t->ne[0], t->ne[1], n_pad, 1);
 +            };
 +
-+            // the query's mask row at the same cells keeps what the cache masks; padding is -inf
-+            ggml_tensor * m = ggml_view_2d(ctx0, kq_mask, 1, n_kv, ggml_element_size(kq_mask), 0);
++            // the query's mask row at the same cells, the dead slots dropped; padding is -inf
++            ggml_tensor * m = ggml_view_2d(ctx0, sel, 1, n_kv, ggml_element_size(sel), 0);
 +            m = ggml_reshape_1d(ctx0, ggml_get_rows(ctx0, m, idx), n_sel);
++            m = ggml_add(ctx0, m, qsa_gather_bias);
 +            if (n_pad > n_sel) {
 +                ggml_tensor * m_pad = ggml_fill(ctx0, ggml_new_tensor_1d(ctx0, GGML_TYPE_F32, n_pad - n_sel), -INFINITY);
 +                m = ggml_concat(ctx0, m, m_pad, 0);
@@ -71,7 +117,7 @@ index 79801e3..0b0440b 100644
 +            m = ggml_reshape_4d(ctx0, ggml_cast(ctx0, m, GGML_TYPE_F16), n_pad, 1, 1, 1);
 +            cb(m, "kq_mask_gathered", il);
 +
-+            ggml_tensor * cur = build_attn_mha(q_cur, gather_cells(k), gather_cells(v), nullptr, m, nullptr, nullptr, 0, kq_scale, il);
++            ggml_tensor * cur = build_attn_mha(q, gather_cells(k), gather_cells(v), nullptr, m, nullptr, nullptr, 0, kq_scale, il);
 +            cb(cur, "kqv_out", il);
 +
 +            if (inp->self_v_rot) {
@@ -82,8 +128,8 @@ index 79801e3..0b0440b 100644
 +        }
 +    }
 +
-     // prepare new kq mask - starts filled with -INFINITY
-     ggml_tensor * kq_mask_all = ggml_fill(ctx0, kq_mask, -INFINITY);
+     ggml_tensor * cur = build_attn_mha(q, k, v, nullptr, sel, nullptr, nullptr, n_sel, kq_scale, il);
+     cb(cur, "kqv_out", il);
  
 -- 
 2.43.0

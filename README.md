@@ -75,10 +75,9 @@ mainboard's iGPU. If you cannot, `PROFILE=display` makes room. Bonsai's WSL2 fig
 current llama.cpp pin, which is 8 % faster on native Linux. Where each number comes from:
 [docs/performance.md](docs/performance.md) and the pages per model.
 
-Speed falls as the context fills. Qwen3.8-Flash holds 16.4 tok/s at 64k and 14.3 at 110k, up from
-12.9 and 10.5: Unsloth's tree ran the model's sparse attention densely over the whole cache, and
-two patches in [`patches/unsloth/`](patches/unsloth/) fix that
-([details](docs/qwen38-flash.md#decode-at-depth)).
+Speed falls as the context fills. Qwen3.8-Flash held 16.4 tok/s at 64k and 14.3 at 110k, up from
+12.9 and 10.5, once the model's sparse attention stopped running over the whole cache at decode:
+a patch in [`patches/unsloth/`](patches/unsloth/) ([details](docs/qwen38-flash.md#decode-at-depth)).
 
 ## And Strata?
 
